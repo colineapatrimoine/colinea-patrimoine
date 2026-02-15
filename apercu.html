@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Colinéa Patrimoine — Aperçu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-bg: #0f1216;
+      --color-bg-soft: #181c24;
+      --color-surface: #1e232d;
+      --color-text: #e8eaed;
+      --color-text-muted: #8b929e;
+      --color-accent: #c9a962;
+      --color-accent-hover: #d4b872;
+      --color-border: rgba(255, 255, 255, 0.06);
+      --font-display: "Cormorant Garamond", Georgia, serif;
+      --font-body: "Outfit", system-ui, sans-serif;
+      --space-xs: 0.5rem;
+      --space-sm: 1rem;
+      --space-md: 1.5rem;
+      --space-lg: 2.5rem;
+      --space-xl: 4rem;
+      --space-2xl: 6rem;
+      --radius: 6px;
+      --transition: 0.25s ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--color-text);
+      background: var(--color-bg);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; transition: color var(--transition), opacity var(--transition); }
+    ul { list-style: none; }
+    .header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: var(--space-md) var(--space-lg);
+      background: rgba(15, 18, 22, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; letter-spacing: 0.02em; }
+    .nav ul { display: flex; gap: var(--space-lg); }
+    .nav a { font-size: 0.9rem; font-weight: 500; color: var(--color-text-muted); }
+    .nav a:hover { color: var(--color-accent); }
+    .nav-toggle {
+      display: none; flex-direction: column; gap: 6px;
+      background: none; border: none; cursor: pointer; padding: 8px; color: var(--color-text);
+    }
+    .nav-toggle span { display: block; width: 24px; height: 2px; background: currentColor; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0.85rem 1.75rem; font-family: var(--font-body); font-size: 0.95rem; font-weight: 500;
+      border-radius: var(--radius); cursor: pointer;
+      transition: background var(--transition), color var(--transition), border-color var(--transition), transform 0.2s ease;
+    }
+    .btn-primary { background: var(--color-accent); color: var(--color-bg); border: 2px solid var(--color-accent); }
+    .btn-primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--color-text); border: 2px solid var(--color-border); }
+    .btn-outline:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    .btn-large { padding: 1rem 2.25rem; font-size: 1rem; }
+    .hero {
+      min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+      padding: calc(80px + var(--space-2xl)) var(--space-lg) var(--space-2xl); position: relative;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201, 169, 98, 0.08) 0%, transparent 50%),
+                  radial-gradient(ellipse 60% 40% at 80% 60%, rgba(201, 169, 98, 0.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 1; max-width: 720px; }
+    .hero-label { font-size: 0.85rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-md); }
+    .hero h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 600; line-height: 1.15; margin-bottom: var(--space-md); letter-spacing: -0.02em; }
+    .hero-desc { font-size: 1.15rem; color: var(--color-text-muted); margin-bottom: var(--space-xl); max-width: 520px; margin-left: auto; margin-right: auto; }
+    .hero-cta { display: flex; flex-wrap: wrap; gap: var(--space-sm); justify-content: center; }
+    .hero-scroll {
+      position: absolute; bottom: var(--space-lg); left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: var(--space-xs);
+      font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--color-text-muted);
+    }
+    .scroll-icon { width: 24px; height: 36px; border: 2px solid var(--color-text-muted); border-radius: 12px; position: relative; }
+    .scroll-icon::after {
+      content: ""; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      width: 4px; height: 8px; background: var(--color-accent); border-radius: 2px;
+      animation: scroll-bounce 2s ease-in-out infinite;
+    }
+    @keyframes scroll-bounce {
+      0%, 100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      50% { opacity: 0.5; transform: translateX(-50%) translateY(6px); }
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 var(--space-lg); }
+    .section-label { font-size: 0.8rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-sm); }
+    .section-title { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 600; line-height: 1.2; margin-bottom: var(--space-xl); letter-spacing: -0.02em; }
+    .services { padding: var(--space-2xl) 0; }
+    .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-lg); }
+    .service-card {
+      padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
+      transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+    .service-card:hover { border-color: rgba(201, 169, 98, 0.3); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+    .service-icon { font-family: var(--font-display); font-size: 2rem; font-weight: 600; color: var(--color-accent); opacity: 0.7; margin-bottom: var(--space-md); }
+    .service-card h3 { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; margin-bottom: var(--space-sm); }
+    .service-card p { font-size: 0.95rem; color: var(--color-text-muted); line-height: 1.65; }
+    .about { padding: var(--space-2xl) 0; background: var(--color-bg-soft); }
+    .about-inner { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2xl); align-items: center; }
+    .about-text { color: var(--color-text-muted); margin-bottom: var(--space-lg); font-size: 1.05rem; }
+    .about-values { display: flex; flex-direction: column; gap: var(--space-sm); }
+    .about-values li { font-size: 0.95rem; color: var(--color-text-muted); }
+    .about-values strong { color: var(--color-accent); font-weight: 500; margin-right: 0.5rem; }
+    .about-visual { display: flex; justify-content: center; align-items: center; }
+    .about-block {
+      width: 100%; max-width: 400px; aspect-ratio: 4/3;
+      background: linear-gradient(135deg, var(--color-surface) 0%, rgba(201, 169, 98, 0.1) 100%);
+      border: 1px solid var(--color-border); border-radius: var(--radius);
+    }
+    .cta-section { padding: var(--space-2xl) 0; text-align: center; }
+    .cta-section h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 600; margin-bottom: var(--space-sm); }
+    .cta-section p { color: var(--color-text-muted); margin-bottom: var(--space-lg); }
+    .contact { padding: var(--space-2xl) 0; }
+    .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2xl); align-items: start; }
+    .contact-info p { color: var(--color-text-muted); margin-bottom: var(--space-md); }
+    .contact-fillout-btn { margin-bottom: var(--space-lg); align-self: flex-start; }
+    .contact-details { display: flex; flex-direction: column; gap: var(--space-md); }
+    .contact-label { display: block; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 2px; }
+    .contact-details a { color: var(--color-accent); font-weight: 500; }
+    .contact-details a:hover { text-decoration: underline; }
+    .contact-form { display: flex; flex-direction: column; gap: var(--space-md); }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.9rem; font-weight: 500; color: var(--color-text-muted); }
+    .form-group input, .form-group textarea {
+      width: 100%; padding: 0.9rem 1rem; font-family: var(--font-body); font-size: 1rem; color: var(--color-text);
+      background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); transition: border-color var(--transition);
+    }
+    .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--color-accent); }
+    .form-group textarea { resize: vertical; min-height: 120px; }
+    .footer { padding: var(--space-lg) 0; border-top: 1px solid var(--color-border); }
+    .footer-inner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-md); }
+    .footer-logo { font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; }
+    .footer-legal { font-size: 0.85rem; color: var(--color-text-muted); }
+    @media (max-width: 900px) {
+      .about-inner { grid-template-columns: 1fr; }
+      .about-visual { order: -1; }
+      .about-block { max-width: 100%; }
+      .contact-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .nav {
+        position: fixed; top: 0; right: 0; width: 280px; height: 100vh;
+        background: var(--color-bg-soft); border-left: 1px solid var(--color-border);
+        padding: calc(80px + var(--space-lg)) var(--space-lg) var(--space-lg);
+        transform: translateX(100%); transition: transform var(--transition);
+      }
+      .nav.is-open { transform: translateX(0); }
+      .nav ul { flex-direction: column; gap: var(--space-md); }
+      .nav a { font-size: 1.1rem; }
+      .nav-toggle { display: flex; z-index: 101; }
+      .nav-toggle[aria-expanded="true"] span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+      .nav-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+      .nav-toggle[aria-expanded="true"] span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+      .hero-cta { flex-direction: column; }
+      .hero-cta .btn { width: 100%; }
+      .services-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .container { padding: 0 var(--space-md); }
+    }
+  </style>
+</head>
+<body>
+  <header class="header" id="header">
+    <div class="header-inner">
+      <a href="#" class="logo">Colinéa Patrimoine</a>
+      <nav class="nav" aria-label="Navigation principale">
+        <ul>
+          <li><a href="#accueil">Accueil</a></li>
+          <li><a href="#services">Services</a></li>
+          <li><a href="#apropos">À propos</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" aria-label="Ouvrir le menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="accueil">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <p class="hero-label">Conseil en patrimoine</p>
+        <h1>Préserver & transmettre<br>votre patrimoine</h1>
+        <p class="hero-desc">Un accompagnement sur mesure pour sécuriser votre avenir et celui de vos proches.</p>
+        <div class="hero-cta">
+          <a href="https://bilan-patrimonial-colinea-patrimoine.fillout.com/t/pkpisywdAaus" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Prendre rendez-vous</a>
+          <a href="#services" class="btn btn-outline">Nos services</a>
+        </div>
+      </div>
+      <div class="hero-scroll" aria-hidden="true">
+        <span>Découvrir</span>
+        <div class="scroll-icon"></div>
+      </div>
+    </section>
+
+    <section class="services" id="services">
+      <div class="container">
+        <p class="section-label">Nos domaines d'expertise</p>
+        <h2 class="section-title">Des solutions adaptées à vos enjeux</h2>
+        <div class="services-grid">
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">01</div>
+            <h3>Gestion de patrimoine</h3>
+            <p>Stratégie d'investissement, diversification et pilotage de vos actifs pour atteindre vos objectifs.</p>
+          </article>
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">02</div>
+            <h3>Transmission & succession</h3>
+            <p>Anticiper la transmission de votre patrimoine dans les meilleures conditions fiscales et familiales.</p>
+          </article>
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">03</div>
+            <h3>Optimisation fiscale</h3>
+            <p>Conseil en fiscalité patrimoniale et optimisation de votre situation dans le respect de la loi.</p>
+          </article>
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">04</div>
+            <h3>Protection & prévoyance</h3>
+            <p>Sécuriser votre famille et vos biens grâce à une couverture adaptée à votre situation.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="about" id="apropos">
+      <div class="container about-inner">
+        <div class="about-content">
+          <p class="section-label">Notre approche</p>
+          <h2 class="section-title">Une relation de confiance,<br>une expertise reconnue</h2>
+          <p class="about-text">Colinéa Patrimoine place l'écoute et la personnalisation au cœur de son métier. Nous construisons avec vous une stratégie patrimoniale claire, alignée sur vos objectifs de vie et votre situation.</p>
+          <ul class="about-values">
+            <li><strong>Écoute</strong> — Chaque situation est unique</li>
+            <li><strong>Transparence</strong> — Des recommandations claires et explicites</li>
+            <li><strong>Discrétion</strong> — Confidentialité absolue</li>
+          </ul>
+        </div>
+        <div class="about-visual">
+          <div class="about-block"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="container">
+        <h2>Prêt à construire votre stratégie patrimoniale ?</h2>
+        <p>Un premier échange sans engagement pour faire le point sur votre situation.</p>
+        <a href="https://bilan-patrimonial-colinea-patrimoine.fillout.com/t/pkpisywdAaus" class="btn btn-primary btn-large" target="_blank" rel="noopener noreferrer">Demander un bilan patrimonial</a>
+      </div>
+    </section>
+
+    <section class="contact" id="contact">
+      <div class="container">
+        <p class="section-label">Échangeons</p>
+        <h2 class="section-title">Contact</h2>
+        <div class="contact-grid">
+          <div class="contact-info">
+            <p>Pour toute demande de rendez-vous ou d'information, n'hésitez pas à nous joindre. Vous pouvez aussi demander un <strong>bilan patrimonial</strong> via notre formulaire en ligne.</p>
+            <a href="https://bilan-patrimonial-colinea-patrimoine.fillout.com/t/pkpisywdAaus" class="btn btn-primary contact-fillout-btn" target="_blank" rel="noopener noreferrer">Formulaire bilan patrimonial</a>
+            <ul class="contact-details">
+              <li>
+                <span class="contact-label">Email</span>
+                <a href="mailto:colineapatrimoine@gmail.com">colineapatrimoine@gmail.com</a>
+              </li>
+              <li>
+                <span class="contact-label">Téléphone</span>
+                <a href="tel:+33629801739">06 29 80 17 39</a>
+              </li>
+            </ul>
+          </div>
+          <form class="contact-form" action="#" method="post" novalidate>
+            <div class="form-group">
+              <label for="name">Nom complet</label>
+              <input type="text" id="name" name="name" required autocomplete="name">
+            </div>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" required autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label for="message">Message</label>
+              <textarea id="message" name="message" rows="4" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Envoyer</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <p class="footer-logo">Colinéa Patrimoine</p>
+        <p class="footer-legal">© 2025 Colinéa Patrimoine. Tous droits réservés.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var navToggle = document.querySelector('.nav-toggle');
+      var nav = document.querySelector('.nav');
+      if (navToggle && nav) {
+        navToggle.addEventListener('click', function () {
+          var isOpen = navToggle.getAttribute('aria-expanded') === 'true';
+          navToggle.setAttribute('aria-expanded', !isOpen);
+          nav.classList.toggle('is-open');
+          document.body.style.overflow = isOpen ? '' : 'hidden';
+        });
+        nav.querySelectorAll('a').forEach(function (link) {
+          link.addEventListener('click', function () {
+            navToggle.setAttribute('aria-expanded', 'false');
+            nav.classList.remove('is-open');
+            document.body.style.overflow = '';
+          });
+        });
+      }
+      var header = document.getElementById('header');
+      if (header) {
+        function updateHeader() {
+          header.style.background = window.scrollY > 50 ? 'rgba(15, 18, 22, 0.95)' : 'rgba(15, 18, 22, 0.85)';
+        }
+        window.addEventListener('scroll', updateHeader, { passive: true });
+        updateHeader();
+      }
+      var form = document.querySelector('.contact-form');
+      if (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var btn = form.querySelector('button[type="submit"]');
+          var originalText = btn.textContent;
+          btn.textContent = 'Envoi en cours…';
+          btn.disabled = true;
+          setTimeout(function () {
+            btn.textContent = 'Message envoyé';
+            btn.style.background = 'var(--color-surface)';
+            btn.style.borderColor = 'var(--color-accent)';
+            btn.style.color = 'var(--color-accent)';
+            form.reset();
+            setTimeout(function () {
+              btn.textContent = originalText;
+              btn.disabled = false;
+              btn.style.background = '';
+              btn.style.borderColor = '';
+              btn.style.color = '';
+            }, 3000);
+          }, 800);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
