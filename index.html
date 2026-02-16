@@ -120,7 +120,13 @@
               </li>
             </ul>
           </div>
-          <form class="contact-form" action="#" method="post" novalidate>
+          <form
+            class="contact-form"
+            name="contact"
+            method="POST"
+            data-netlify="true"
+          >
+            <input type="hidden" name="form-name" value="contact">
             <div class="form-group">
               <label for="name">Nom complet</label>
               <input type="text" id="name" name="name" required autocomplete="name">

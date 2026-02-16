@@ -37,32 +37,43 @@
     updateHeader();
   }
 
-  // Formulaire de contact (message de confirmation simple)
+  // Formulaire de contact
   var form = document.querySelector('.contact-form');
   if (form) {
     form.addEventListener('submit', function (e) {
+      // Si le formulaire est géré par Netlify (data-netlify="true"),
+      // on laisse l'envoi normal vers Netlify.
+      if (form.hasAttribute('data-netlify')) {
+        return;
+      }
+
       e.preventDefault();
-      // En production : envoyer les données vers un backend ou un service (ex: Formspree, Netlify Forms)
-      var btn = form.querySelector('button[type="submit"]');
-      var originalText = btn.textContent;
-      btn.textContent = 'Envoi en cours…';
-      btn.disabled = true;
+      // Par défaut : ouvre le logiciel d'email du visiteur
+      // avec un message prérempli adressé à colineapatrimoine@gmail.com.
+      var nameInput = form.querySelector('#name');
+      var emailInput = form.querySelector('#email');
+      var messageInput = form.querySelector('#message');
 
-      setTimeout(function () {
-        btn.textContent = 'Message envoyé';
-        btn.style.background = 'var(--color-surface)';
-        btn.style.borderColor = 'var(--color-accent)';
-        btn.style.color = 'var(--color-accent)';
-        form.reset();
+      var name = nameInput ? nameInput.value.trim() : '';
+      var email = emailInput ? emailInput.value.trim() : '';
+      var message = messageInput ? messageInput.value.trim() : '';
 
-        setTimeout(function () {
-          btn.textContent = originalText;
-          btn.disabled = false;
-          btn.style.background = '';
-          btn.style.borderColor = '';
-          btn.style.color = '';
-        }, 3000);
-      }, 800);
+      var subject = 'Contact site Colinéa Patrimoine';
+      var bodyLines = [];
+      if (name) bodyLines.push('Nom : ' + name);
+      if (email) bodyLines.push('Email : ' + email);
+      if (message) {
+        bodyLines.push('');
+        bodyLines.push('Message :');
+        bodyLines.push(message);
+      }
+
+      var body = encodeURIComponent(bodyLines.join('\n'));
+      var mailto = 'mailto:colineapatrimoine@gmail.com'
+        + '?subject=' + encodeURIComponent(subject)
+        + '&body=' + body;
+
+      window.location.href = mailto;
     });
   }
 })();
