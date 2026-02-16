@@ -37,43 +37,6 @@
     updateHeader();
   }
 
-  // Formulaire de contact
-  var form = document.querySelector('.contact-form');
-  if (form) {
-    form.addEventListener('submit', function (e) {
-      // Si le formulaire est géré par Netlify (data-netlify="true"),
-      // on laisse l'envoi normal vers Netlify.
-      if (form.hasAttribute('data-netlify')) {
-        return;
-      }
-
-      e.preventDefault();
-      // Par défaut : ouvre le logiciel d'email du visiteur
-      // avec un message prérempli adressé à colineapatrimoine@gmail.com.
-      var nameInput = form.querySelector('#name');
-      var emailInput = form.querySelector('#email');
-      var messageInput = form.querySelector('#message');
-
-      var name = nameInput ? nameInput.value.trim() : '';
-      var email = emailInput ? emailInput.value.trim() : '';
-      var message = messageInput ? messageInput.value.trim() : '';
-
-      var subject = 'Contact site Colinéa Patrimoine';
-      var bodyLines = [];
-      if (name) bodyLines.push('Nom : ' + name);
-      if (email) bodyLines.push('Email : ' + email);
-      if (message) {
-        bodyLines.push('');
-        bodyLines.push('Message :');
-        bodyLines.push(message);
-      }
-
-      var body = encodeURIComponent(bodyLines.join('\n'));
-      var mailto = 'mailto:colineapatrimoine@gmail.com'
-        + '?subject=' + encodeURIComponent(subject)
-        + '&body=' + body;
-
-      window.location.href = mailto;
-    });
-  }
+  // Pas de logique JS sur le formulaire :
+  // Netlify gère directement l'envoi et la redirection.
 })();
