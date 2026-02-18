@@ -36,7 +36,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="has-promo-banner">
+  <div class="promo-banner" role="banner">
+    <div class="promo-banner-inner">
+      <span class="promo-banner-text">🎁 Bilan patrimonial offert — sans engagement</span>
+      <a href="https://bilan-patrimonial-colinea-patrimoine.fillout.com/t/pkpisywdAaus" class="promo-banner-cta" target="_blank" rel="noopener noreferrer">En profiter</a>
+    </div>
+  </div>
   <header class="header" id="header">
     <div class="header-inner">
       <a href="#" class="logo-link">
@@ -49,6 +55,8 @@
           <li><a href="#services">Services</a></li>
           <li><a href="#apropos">À propos</a></li>
           <li><a href="#temoignages">Témoignages</a></li>
+          <li><a href="#comment">Comment ça marche</a></li>
+          <li><a href="actualites.html">Actualités</a></li>
           <li><a href="#contact">Contact</a></li>
         </ul>
       </nav>
@@ -76,7 +84,7 @@
       </div>
     </section>
 
-    <section class="services" id="services">
+    <section class="services reveal" id="services">
       <div class="container">
         <p class="section-label">Nos domaines d'expertise</p>
         <h2 class="section-title">Des solutions adaptées à vos enjeux</h2>
@@ -109,7 +117,31 @@
       </div>
     </section>
 
-    <section class="about" id="apropos">
+    <section class="how-it-works" id="comment">
+      <div class="container">
+        <p class="section-label">Votre parcours</p>
+        <h2 class="section-title">Comment ça marche</h2>
+        <div class="steps-grid">
+          <article class="step-card reveal">
+            <span class="step-number">1</span>
+            <h3>Premier échange</h3>
+            <p>Nous faisons connaissance et j’analyse avec vous votre situation, vos objectifs et vos questions. Cet échange est gratuit et sans engagement.</p>
+          </article>
+          <article class="step-card reveal">
+            <span class="step-number">2</span>
+            <h3>Bilan personnalisé</h3>
+            <p>Je vous propose un bilan patrimonial détaillé, avec des simulations et des pistes adaptées à votre profil. Le bilan est offert.</p>
+          </article>
+          <article class="step-card reveal">
+            <span class="step-number">3</span>
+            <h3>Suivi dans la durée</h3>
+            <p>Si vous le souhaitez, nous mettons en place un accompagnement personnalisé et des points réguliers pour faire évoluer votre stratégie.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="about reveal" id="apropos">
       <div class="container about-inner">
         <div class="about-content">
           <p class="section-label">Notre approche</p>
@@ -133,7 +165,7 @@
       </div>
     </section>
 
-    <section class="testimonials" id="temoignages">
+    <section class="testimonials reveal" id="temoignages">
       <div class="container">
         <p class="section-label">Ils nous font confiance</p>
         <h2 class="section-title">Témoignages de clients accompagnés</h2>
@@ -154,7 +186,36 @@
       </div>
     </section>
 
-    <section class="cta-section">
+    <section class="faq reveal" id="faq">
+      <div class="container">
+        <p class="section-label">Questions fréquentes</p>
+        <h2 class="section-title">FAQ</h2>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary class="faq-question">Le bilan patrimonial est-il vraiment gratuit ?</summary>
+            <p class="faq-answer">Oui. Le premier échange et le bilan patrimonial personnalisé sont offerts, sans engagement. Vous décidez ensuite si vous souhaitez poursuivre avec un accompagnement.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Comment se déroule le premier rendez-vous ?</summary>
+            <p class="faq-answer">Nous échangeons ensemble sur votre situation (familiale, professionnelle, patrimoniale), vos objectifs et vos questions. Ce premier échange permet de voir si un accompagnement est pertinent pour vous.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">À partir de quel niveau de patrimoine puis-je vous consulter ?</summary>
+            <p class="faq-answer">Il n’y a pas de minimum. Que vous commenciez à épargner ou que vous ayez déjà un patrimoine à structurer, nous pouvons en parler. L’accompagnement s’adapte à votre situation.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Quels documents préparer pour le premier échange ?</summary>
+            <p class="faq-answer">Aucun document n’est obligatoire pour le premier contact. Si nous convenons d’un bilan détaillé, je vous indiquerai ensuite les éléments utiles (relevés, contrats, situation fiscale) pour affiner l’analyse.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Êtes-vous indépendant ou lié à une banque ?</summary>
+            <p class="faq-answer">Je suis conseiller en gestion de patrimoine indépendant. Je m’appuie sur la plateforme INOVEA et l’outil Filianse pour vous proposer des solutions adaptées, sans être lié à un établissement en particulier.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section reveal">
       <div class="container">
         <h2>Prêt à construire votre stratégie patrimoniale ?</h2>
         <p>Un premier échange sans engagement pour faire le point sur votre situation.</p>
@@ -162,7 +223,7 @@
       </div>
     </section>
 
-    <section class="contact" id="contact">
+    <section class="contact reveal" id="contact">
       <div class="container">
         <p class="section-label">Échangeons</p>
         <h2 class="section-title">Contact</h2>
@@ -215,6 +276,10 @@
       </div>
     </div>
   </footer>
+
+  <a href="https://bilan-patrimonial-colinea-patrimoine.fillout.com/t/pkpisywdAaus" class="floating-cta" target="_blank" rel="noopener noreferrer" aria-label="Demander un bilan patrimonial offert">
+    <span class="floating-cta-text">Bilan offert</span>
+  </a>
 
   <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Choix des cookies" aria-hidden="true"></div>
   <script src="script.js" defer></script>

@@ -66,4 +66,19 @@
       banner.classList.add('cookie-banner-visible');
     }
   }
+
+  // Animations au scroll (reveal)
+  var revealEls = document.querySelectorAll('.reveal');
+  if (revealEls.length && 'IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('reveal-visible');
+        }
+      });
+    }, { rootMargin: '0px 0px -40px 0px', threshold: 0.1 });
+    revealEls.forEach(function (el) { observer.observe(el); });
+  } else {
+    revealEls.forEach(function (el) { el.classList.add('reveal-visible'); });
+  }
 })();
