@@ -474,7 +474,7 @@ ul {
   height: auto;
   aspect-ratio: 3/4;
   object-fit: cover;
-  opacity: 0.92;
+  opacity: 0.78;
 }
 
 /* ===== CTA section ===== */
@@ -695,7 +695,7 @@ ul {
   .about-img-vertical {
     max-height: 520px;
     max-width: 100%;
-    opacity: 0.92;
+    opacity: 0.78;
   }
 
   .contact-grid {
