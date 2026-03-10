@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colinéa Patrimoine — Outil</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body class="app-body">
+  <div id="app-gate" class="app-gate" aria-label="Accès réservé">
+    <div class="app-gate-inner">
+      <p class="app-gate-label">Espace interne</p>
+      <h1 class="app-gate-title">Accès réservé</h1>
+      <p class="app-gate-desc">Saisis le code pour accéder à l’outil.</p>
+      <form class="app-gate-form" id="app-gate-form" autocomplete="off">
+        <input type="password" id="app-gate-code" class="app-gate-input" placeholder="Code d’accès" autocomplete="off" autofocus />
+        <button type="submit" class="btn btn-primary">Accéder</button>
+      </form>
+      <p id="app-gate-error" class="app-gate-error" aria-live="polite" hidden>Code incorrect.</p>
+    </div>
+  </div>
+
+  <div id="app-wrap" class="app-wrap" hidden>
+  <header class="header app-header" id="header">
+    <div class="header-inner">
+      <a href="index.html#accueil" class="logo-link">
+        <img src="Logo site.png" alt="Colinéa Patrimoine" class="logo-img" width="120" height="40" />
+        <span class="logo">Outil conseil</span>
+      </a>
+      <nav class="nav app-nav" aria-label="Navigation outil">
+        <ul>
+          <li><a href="#/dashboard" data-nav>Tableau de bord</a></li>
+          <li><a href="#/clients" data-nav>Clients</a></li>
+          <li><a href="#/simulations" data-nav>Simulations</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" aria-label="Ouvrir le menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="container app-container">
+      <div class="app-topline">
+        <div>
+          <p class="section-label">Espace interne</p>
+          <h1 class="app-title" id="app-title">Tableau de bord</h1>
+          <p class="app-subtitle" id="app-subtitle">Vue d’ensemble de vos dossiers et simulations.</p>
+        </div>
+        <div class="app-actions" id="app-actions"></div>
+      </div>
+
+      <section class="app-content" id="app-root" aria-live="polite"></section>
+    </div>
+  </main>
+
+  <footer class="footer app-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <p class="footer-logo">Colinéa Patrimoine</p>
+        <p class="footer-legal">Outil local (stockage sur cet appareil). <a href="index.html">Retour au site</a></p>
+      </div>
+    </div>
+  </footer>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
