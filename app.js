@@ -767,75 +767,240 @@
 
     var contentHtml = "";
     if (step.id === "intro") {
+      var realisePour = (a.intro && a.intro.realise_pour) || "";
+      var representePar = (a.intro && a.intro.represente_par) || "";
+      var comprendObjectif = (a.intro && a.intro.comprend_objectif) ? " checked" : "";
       contentHtml =
         "<h2>Profil investisseur</h2>" +
-        '<p class="step-desc">Ce questionnaire permet d\'évaluer vos préférences de placement, votre connaissance des marchés financiers et votre sensibilité au risque. Répondez de manière spontanée ; il n\'y a pas de « bonne » réponse.</p>' +
-        "<p class=\"step-desc\">Vous pourrez à tout moment revenir en arrière ou fermer sans enregistrer.</p>";
+        '<p class="step-desc">Ce questionnaire permet à chaque individu de déterminer son profil d\'investisseur, pour le guider vers des solutions de placement adaptées, grâce à :</p>' +
+        '<ul class="step-list"><li>l\'évaluation du niveau de connaissance et d\'expérience des marchés financiers ;</li>' +
+        '<li>la mesure de la sensibilité au risque qui joue un rôle déterminant dans l\'analyse des comportements d\'épargne et de gestion de capital ;</li>' +
+        '<li>l\'identification des préférences de placement pour de futurs projets.</li></ul>' +
+        '<p class="step-desc">La fourniture d\'informations complètes et sincères est une condition nécessaire pour bénéficier d\'un service de qualité.</p>' +
+        '<form id="profil-step-form">' +
+        '<div class="form-group"><label for="profil-intro-realise">Réalisé pour</label><input type="text" id="profil-intro-realise" name="profil_intro_realise_pour" value="' + escapeHtml(realisePour) + '" class="form-control" /></div>' +
+        '<div class="form-group"><label for="profil-intro-represente">Représenté par <span class="info-icon" title="Information">ⓘ</span></label><input type="text" id="profil-intro-represente" name="profil_intro_represente_par" value="' + escapeHtml(representePar) + '" class="form-control" /></div>' +
+        '<div class="form-group"><label class="checkbox-label"><input type="checkbox" name="profil_intro_comprend_objectif"' + comprendObjectif + ' /> Je comprends l\'objectif de ce questionnaire</label></div>' +
+        "</form>";
     } else if (step.id === "connaissance") {
-      var monOps = (a.connaissance && a.connaissance.monetaire_ops) || "";
-      var oblOps = (a.connaissance && a.connaissance.obligataire_ops) || "";
+      var c = a.connaissance || {};
+      var produitsDetenus = c.produits_detenus || [];
+      var modesGestion = c.modes_gestion || [];
+      var avOui = c.assurance_vie_oui === "oui";
+      var peaOui = c.pea_oui === "oui";
+      var erOui = c.epargne_retraite_oui === "oui";
+      var fondsEurosOui = c.fonds_euros_oui === "oui";
+      var monChecked = c.monetaire_checked ? " checked" : "";
+      var oblChecked = c.obligataire_checked ? " checked" : "";
+      var actChecked = c.actions_checked ? " checked" : "";
+      var fondsEurosChecked = c.fonds_euros_checked ? " checked" : "";
+      var monOps = c.monetaire_ops || "";
+      var oblOps = c.obligataire_ops || "";
+      var actOps = c.actions_ops || "";
+      var feOps = c.fonds_euros_ops || "";
+      var defisc = c.defiscalisation || "";
+      var levier = c.levier || "";
+      var montantTx = c.montant_transaction || "";
+      var pertesSubies = c.pertes_subies || "";
+      function isChecked(arr, id) { return arr.indexOf(id) !== -1; }
       contentHtml =
         "<h2>Profil investisseur</h2>" +
-        '<p class="step-desc"><strong>Connaissance et Expérience</strong> — Pour chaque type de produit, indiquez votre niveau de connaissance et le nombre d\'opérations réalisées au cours des 12 derniers mois.</p>' +
+        '<p class="step-desc"><strong>Connaissance & expérience</strong></p>' +
         '<form id="profil-step-form">' +
         '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
-        '<h3 class="about-subtitle" style="margin-top: 0;">Produits monétaires</h3>' +
-        "<p class=\"about-text\" style=\"margin-bottom: 0.75rem;\">(Fonds monétaires, OPC monétaires)</p>" +
+        '<p style="font-weight: 600; margin-bottom: 0.75rem;">Parmi les produits suivants, cochez ceux que vous détenez ou avez détenus au cours des 12 derniers mois :</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="checkbox" name="profil_c_produits" value="livrets"' + (isChecked(produitsDetenus, "livrets") ? " checked" : "") + ' /> Des comptes et livrets d\'épargne (livret A, LDDS, PEL, CEL...).</label>' +
+        '<label><input type="checkbox" name="profil_c_produits" value="assurance_vie"' + (isChecked(produitsDetenus, "assurance_vie") ? " checked" : "") + ' /> Un ou plusieurs contrats d\'assurance-vie ou de capitalisation.</label>' +
+        '<label><input type="checkbox" name="profil_c_produits" value="comptes_titres"' + (isChecked(produitsDetenus, "comptes_titres") ? " checked" : "") + ' /> Un ou plusieurs comptes titres (compte titres ordinaire, PEA...).</label>' +
+        '<label><input type="checkbox" name="profil_c_produits" value="epargne_retraite"' + (isChecked(produitsDetenus, "epargne_retraite") ? " checked" : "") + ' /> Un ou plusieurs produits d\'Épargne Retraite (PER, PERP, Madelin, Perco, Contrat Prefon...).</label>' +
+        '<label><input type="checkbox" name="profil_c_produits" value="epargne_salariale"' + (isChecked(produitsDetenus, "epargne_salariale") ? " checked" : "") + ' /> Un ou plusieurs produits d\'Épargne Salariale (PEE, PEI).</label>' +
+        '<label><input type="checkbox" name="profil_c_produits" value="fip_scpi"' + (isChecked(produitsDetenus, "fip_scpi") ? " checked" : "") + ' /> Un ou plusieurs produits de capital investissement (FIP, FCPI...) ou des SCPI.</label>' +
+        '<label><input type="checkbox" name="profil_c_produits" value="ne_pas_repondre"' + (isChecked(produitsDetenus, "ne_pas_repondre") ? " checked" : "") + ' /> Je préfère ne pas répondre</label></div></div>' +
+        '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
+        '<p style="font-weight: 600; margin-bottom: 0.75rem;">A quels modes de gestion avez-vous eu recours ?</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="checkbox" name="profil_c_modes" value="directe"' + (isChecked(modesGestion, "directe") ? " checked" : "") + ' /> Gestion directe, vous vous occupez vous-même de votre gestion.</label>' +
+        '<label><input type="checkbox" name="profil_c_modes" value="conseillee"' + (isChecked(modesGestion, "conseillee") ? " checked" : "") + ' /> Gestion conseillée, vous êtes conseillé par votre conseiller financier pour effectuer vos choix de gestion.</label>' +
+        '<label><input type="checkbox" name="profil_c_modes" value="mandat"' + (isChecked(modesGestion, "mandat") ? " checked" : "") + ' /> Gestion sous mandat, votre gestion est déléguée à un organisme de gestion.</label>' +
+        '<label><input type="checkbox" name="profil_c_modes" value="ne_pas_repondre"' + (isChecked(modesGestion, "ne_pas_repondre") ? " checked" : "") + ' /> Je préfère ne pas répondre</label></div></div>' +
+        '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
+        '<p style="font-weight: 600; margin-bottom: 0.75rem;">Connaissez-vous les familles de produits suivantes ? Si oui, sélectionnez les affirmations avec lesquelles vous êtes d\'accord.</p>' +
+        '<p style="margin-bottom: 0.5rem;">Assurance-vie et capitalisation</p>' +
+        '<div class="profil-ops-group" data-name="profil_c_assurance_vie">' +
+        '<button type="button" class="profil-ops-btn' + (c.assurance_vie_oui === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (c.assurance_vie_oui === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div>' +
+        '<div class="connaissance-followup" data-followup="assurance_vie"' + (avOui ? "" : ' style="display:none;"') + '>' +
+        '<p style="font-size: 0.9rem; margin-top: 0.75rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_c_av_affirm1" value="1" /> La clause bénéficiaire permet de désigner les bénéficiaires en cas de décès du souscripteur.</label>' +
+        '<label><input type="radio" name="profil_c_av_affirm1" value="2" /> La clause bénéficiaire permet de définir les bénéficiaires en cas de rachat du contrat.</label>' +
+        '<label><input type="radio" name="profil_c_av_affirm1" value="3" /> La clause bénéficiaire permet de définir les conditions que doivent remplir mes héritiers pour pouvoir percevoir le capital investi.</label>' +
+        '<label><input type="radio" name="profil_c_av_affirm1" value="4" /> Je ne sais pas.</label></div>' +
+        '<p style="font-size: 0.9rem; margin-top: 0.75rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_c_av_affirm2" value="1" /> Sur un contrat de capitalisation je désigne des bénéficiaires.</label>' +
+        '<label><input type="radio" name="profil_c_av_affirm2" value="2" /> Sur un contrat d\'assurance vie je désigne des bénéficiaires.</label>' +
+        '<label><input type="radio" name="profil_c_av_affirm2" value="3" /> La liste des bénéficiaires d\'un contrat de capitalisation ou d\'un contrat d\'assurance-vie est restreinte à la liste des héritiers de l\'assuré.</label>' +
+        '<label><input type="radio" name="profil_c_av_affirm2" value="4" /> Je ne sais pas.</label></div></div>' +
+        '<p style="margin-bottom: 0.5rem; margin-top: 1rem;">PEA et comptes-titres</p>' +
+        '<div class="profil-ops-group" data-name="profil_c_pea">' +
+        '<button type="button" class="profil-ops-btn' + (c.pea_oui === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (c.pea_oui === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div>' +
+        '<div class="connaissance-followup" data-followup="pea"' + (peaOui ? "" : ' style="display:none;"') + '>' +
+        '<p style="font-size: 0.9rem; margin-top: 0.75rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_c_pea_affirm1" value="1" /> Sur le compte titre, si je vends une action pour en acheter une autre, je ne paye pas d\'impôt.</label>' +
+        '<label><input type="radio" name="profil_c_pea_affirm1" value="2" /> Sur le PEA, si je vends une action pour en acheter une autre, je ne paye pas d\'impôt.</label>' +
+        '<label><input type="radio" name="profil_c_pea_affirm1" value="3" /> Après 5 ans, les dividendes et plus-values dégagées par le PEA sont exonérés d\'impôt et des prélèvements sociaux contrairement au compte titre.</label>' +
+        '<label><input type="radio" name="profil_c_pea_affirm1" value="4" /> Je ne sais pas.</label></div>' +
+        '<p style="font-size: 0.9rem; margin-top: 0.75rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_c_pea_affirm2" value="1" /> Sur le PEA, je peux acheter des actions, obligations, immeubles...</label>' +
+        '<label><input type="radio" name="profil_c_pea_affirm2" value="2" /> Le compte-titres doit être investi à 75% au moins en actions d\'entreprises cotées en dehors de l\'Union européenne.</label>' +
+        '<label><input type="radio" name="profil_c_pea_affirm2" value="3" /> Sur le PEA, je peux acheter des actions européennes.</label>' +
+        '<label><input type="radio" name="profil_c_pea_affirm2" value="4" /> Je ne sais pas.</label></div></div>' +
+        '<p style="margin-bottom: 0.5rem; margin-top: 1rem;">Épargne retraite et entreprise</p>' +
+        '<div class="profil-ops-group" data-name="profil_c_epargne_retraite">' +
+        '<button type="button" class="profil-ops-btn' + (c.epargne_retraite_oui === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (c.epargne_retraite_oui === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div>' +
+        '<div class="connaissance-followup" data-followup="epargne_retraite"' + (erOui ? "" : ' style="display:none;"') + '><p class="about-text" style="margin-top: 0.75rem;">Si vous avez répondu Oui, précisez votre connaissance de ces produits.</p></div></div>' +
+        '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
+        '<p style="font-weight: 600; margin-bottom: 0.5rem;">Connaissez-vous ou avez-vous réalisé des opérations au cours des 12 derniers mois sur les instruments financiers suivants ? Si oui, cochez ceux dont vous connaissez le fonctionnement.</p>' +
+        '<p style="margin-bottom: 0.5rem;">Fonds euros, produits monétaires, obligataires et actions</p>' +
+        '<div class="profil-ops-group" data-name="profil_c_fonds_euros_global">' +
+        '<button type="button" class="profil-ops-btn' + (c.fonds_euros_oui === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (c.fonds_euros_oui === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div>' +
+        '<div class="connaissance-block-content connaissance-fonds-euros-reveal" data-block="fonds_euros_global"' + (fondsEurosOui ? ' style="display:block;"' : ' style="display:none;"') + '>' +
+        '<label class="connaissance-toggle" style="margin-top: 1rem;"><input type="checkbox" class="connaissance-checkbox" data-block="fonds_euros"' + (fondsEurosChecked ? " checked" : "") + ' /><strong>Fonds euros</strong></label>' +
+        '<div class="connaissance-block-content" data-block="fonds_euros"' + (fondsEurosChecked ? ' style="display:block;"' : "") + '>' +
+        '<p style="font-size: 0.9rem; margin-top: 0.75rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_connaissance_fonds_euros_affirm" value="1" /> En cas de baisse des marchés financiers, votre investissement en fonds euros va subir la même évolution.</label>' +
+        '<label><input type="radio" name="profil_connaissance_fonds_euros_affirm" value="2" /> Les fonds en euros sont composés essentiellement d\'investissements obligataires garantis par la compagnie vous assurant de ne pas perdre votre capital.</label>' +
+        '<label><input type="radio" name="profil_connaissance_fonds_euros_affirm" value="3" /> A long terme, les rendements des fonds euros sont plus élevés que ceux des unités de compte.</label>' +
+        '<label><input type="radio" name="profil_connaissance_fonds_euros_affirm" value="4" /> Je ne sais pas.</label></div>' +
+        '<p style="font-size: 0.9rem; margin-top: 0.5rem;">Opérations réalisées au cours des 12 derniers mois :</p>' +
+        '<div class="profil-ops-group" data-name="profil_connaissance_fonds_euros_ops">' +
+        '<button type="button" class="profil-ops-btn' + (feOps === "0" ? " is-selected" : "") + '" data-value="0">Aucune</button>' +
+        '<button type="button" class="profil-ops-btn' + (feOps === "1-5" ? " is-selected" : "") + '" data-value="1-5">De 1 à 5</button>' +
+        '<button type="button" class="profil-ops-btn' + (feOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button></div></div></div>' +
+        '<div class="app-card connaissance-card connaissance-fonds-euros-reveal" style="margin-bottom: var(--space-lg);' + (fondsEurosOui ? "" : " display:none;") + '">' +
+        '<label class="connaissance-toggle">' +
+        '<input type="checkbox" class="connaissance-checkbox" data-block="monetaire"' + monChecked + " />" +
+        '<strong>Produits monétaires</strong></label>' +
+        "<p class=\"about-text\" style=\"margin-bottom: 0.5rem;\">(Fonds monétaires, OPC monétaires)</p>" +
+        '<div class="connaissance-block-content" data-block="monetaire"' + (monChecked ? ' style="display:block;"' : "") + ">" +
         '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Affirmeriez-vous plutôt :</p>' +
         '<div class="profil-choice-group" style="margin-bottom: 1rem;">' +
-        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="1" /> Les fonds monétaires sont composés principalement de TCN, bons du Trésor et obligations à court terme.</label>' +
+        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="1" /> Les fonds monétaires sont composés principalement de titres de créances négociables (TCN), de bons du Trésor, ainsi que d\'obligations à court terme.</label>' +
         '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="2" /> L\'investissement sur des OPC monétaires est parfaitement adapté pour un investissement de long terme.</label>' +
         '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="3" /> En investissant sur des fonds monétaires, le capital est garanti.</label>' +
-        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="4" /> Je ne sais pas.</label>' +
-        "</div>" +
+        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="4" /> Je ne sais pas.</label></div>' +
         '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Opérations réalisées au cours des 12 derniers mois :</p>' +
         '<div class="profil-ops-group" data-name="profil_connaissance_monetaire_ops">' +
         '<button type="button" class="profil-ops-btn' + (monOps === "0" ? " is-selected" : "") + '" data-value="0">Aucune</button>' +
         '<button type="button" class="profil-ops-btn' + (monOps === "1-5" ? " is-selected" : "") + '" data-value="1-5">De 1 à 5</button>' +
-        '<button type="button" class="profil-ops-btn' + (monOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button>' +
-        "</div></div>" +
-        '<div class="app-card">' +
-        "<h3 class=\"about-subtitle\" style=\"margin-top: 0;\">Produits obligataires</h3>" +
-        "<p class=\"about-text\" style=\"margin-bottom: 0.75rem;\">(Obligations, fonds obligataires, titres de créance...)</p>" +
+        '<button type="button" class="profil-ops-btn' + (monOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button></div></div></div>' +
+        '<div class="app-card connaissance-card connaissance-fonds-euros-reveal" style="margin-bottom: var(--space-lg);' + (fondsEurosOui ? "" : " display:none;") + '">' +
+        '<label class="connaissance-toggle">' +
+        '<input type="checkbox" class="connaissance-checkbox" data-block="obligataire"' + oblChecked + " />" +
+        '<strong>Produits obligataires</strong></label>' +
+        "<p class=\"about-text\" style=\"margin-bottom: 0.5rem;\">(Obligations, fonds obligataires, OPC obligataires, titres de créance... à l'exception de ceux qui comportent un instrument dérivé)</p>" +
+        '<div class="connaissance-block-content" data-block="obligataire"' + (oblChecked ? ' style="display:block;"' : "") + ">" +
         '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Affirmeriez-vous plutôt :</p>' +
         '<div class="profil-choice-group" style="margin-bottom: 1rem;">' +
-        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="1" /> Les obligations sont des dettes pour lesquelles le défaut de remboursement est inexistant.</label>' +
-        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="2" /> Pour une obligation, un taux élevé indique un risque faible.</label>' +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="1" /> Les obligations sont des dettes d\'État ou d\'entreprise pour lesquelles le défaut de remboursement des organismes emprunteurs est inexistant.</label>' +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="2" /> Pour une obligation, un taux d\'intérêt élevé indique un risque faible.</label>' +
         '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="3" /> La performance d\'un fonds obligataire varie avec les évolutions des taux d\'intérêt.</label>' +
-        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="4" /> Je ne sais pas.</label>' +
-        "</div>" +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="4" /> Je ne sais pas.</label></div>' +
         '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Opérations réalisées au cours des 12 derniers mois :</p>' +
         '<div class="profil-ops-group" data-name="profil_connaissance_obligataire_ops">' +
         '<button type="button" class="profil-ops-btn' + (oblOps === "0" ? " is-selected" : "") + '" data-value="0">Aucune</button>' +
         '<button type="button" class="profil-ops-btn' + (oblOps === "1-5" ? " is-selected" : "") + '" data-value="1-5">De 1 à 5</button>' +
-        '<button type="button" class="profil-ops-btn' + (oblOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button>' +
-        "</div></div></form>";
+        '<button type="button" class="profil-ops-btn' + (oblOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button></div></div></div>' +
+        '<div class="app-card connaissance-card connaissance-fonds-euros-reveal" style="margin-bottom: var(--space-lg);' + (fondsEurosOui ? "" : " display:none;") + '">' +
+        '<label class="connaissance-toggle">' +
+        '<input type="checkbox" class="connaissance-checkbox" data-block="actions"' + actChecked + " />" +
+        '<strong>Produits actions</strong></label>' +
+        "<p class=\"about-text\" style=\"margin-bottom: 0.5rem;\">(Actions, fonds en actions, OPC actions... admis à la négociation sur un marché réglementé à l'exception de ceux qui comportent un instrument dérivé)</p>" +
+        '<div class="connaissance-block-content" data-block="actions"' + (actChecked ? ' style="display:block;"' : "") + ">" +
+        '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group" style="margin-bottom: 1rem;">' +
+        '<label><input type="radio" name="profil_connaissance_actions_affirm" value="1" /> Les actions répondent à un investissement à court terme.</label>' +
+        '<label><input type="radio" name="profil_connaissance_actions_affirm" value="2" /> Les variations du cours de l\'action dépendent de la santé financière de l\'entreprise et de son environnement économique.</label>' +
+        '<label><input type="radio" name="profil_connaissance_actions_affirm" value="3" /> Avec des actions, l\'investisseur bénéficie de revenus réguliers car les entreprises ont l\'obligation de verser des dividendes aux actionnaires.</label>' +
+        '<label><input type="radio" name="profil_connaissance_actions_affirm" value="4" /> Je ne sais pas.</label></div>' +
+        '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Opérations réalisées au cours des 12 derniers mois :</p>' +
+        '<div class="profil-ops-group" data-name="profil_connaissance_actions_ops">' +
+        '<button type="button" class="profil-ops-btn' + (actOps === "0" ? " is-selected" : "") + '" data-value="0">Aucune</button>' +
+        '<button type="button" class="profil-ops-btn' + (actOps === "1-5" ? " is-selected" : "") + '" data-value="1-5">De 1 à 5</button>' +
+        '<button type="button" class="profil-ops-btn' + (actOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button></div></div></div>' +
+        '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
+        '<p style="font-weight: 600; margin-bottom: 0.5rem;">Défiscalisation, immobilier et produits structurés</p>' +
+        '<div class="profil-ops-group" data-name="profil_connaissance_defiscalisation">' +
+        '<button type="button" class="profil-ops-btn' + (defisc === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (defisc === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div>' +
+        '<div class="connaissance-followup" data-followup="defiscalisation"' + (defisc === "oui" ? "" : ' style="display:none;"') + '><p class="about-text" style="margin-top: 0.75rem;">Précisez si vous avez une expérience en défiscalisation, immobilier ou produits structurés (OPCI, SCPI, Girardin, etc.).</p></div></div>' +
+        '<div class="app-card">' +
+        '<p style="font-weight: 600; margin-bottom: 0.5rem;">Produits à effet de levier et produits boursiers</p>' +
+        '<div class="profil-ops-group" data-name="profil_connaissance_levier">' +
+        '<button type="button" class="profil-ops-btn' + (levier === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (levier === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div>' +
+        '<div class="connaissance-followup" data-followup="levier"' + (levier === "oui" ? "" : ' style="display:none;"') + '><p class="about-text" style="margin-top: 0.75rem;">Précisez si vous avez une expérience en produits à effet de levier (CFD, options, warrants, turbos, etc.).</p></div></div>' +
+        '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
+        '<p style="font-weight: 600; margin-bottom: 0.5rem;">Quel montant de transaction (versement, arbitrage, retrait) avez-vous effectué sur ces 12 derniers mois ?</p>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_c_montant_transaction" value="aucun"' + (montantTx === "aucun" ? " checked" : "") + ' /> Aucun</label>' +
+        '<label><input type="radio" name="profil_c_montant_transaction" value="<=3000"' + (montantTx === "<=3000" ? " checked" : "") + ' /> Inférieur ou égal à 3 000 euros</label>' +
+        '<label><input type="radio" name="profil_c_montant_transaction" value="3000-10000"' + (montantTx === "3000-10000" ? " checked" : "") + ' /> Entre 3 000 et 10 000 euros</label>' +
+        '<label><input type="radio" name="profil_c_montant_transaction" value=">10000"' + (montantTx === ">10000" ? " checked" : "") + ' /> Supérieur à 10 000 euros</label></div></div>' +
+        '<div class="app-card">' +
+        '<p style="font-weight: 600; margin-bottom: 0.5rem;">Avez-vous déjà subi des pertes sur vos placements financiers ?</p>' +
+        '<div class="profil-ops-group" data-name="profil_c_pertes_subies">' +
+        '<button type="button" class="profil-ops-btn' + (pertesSubies === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (pertesSubies === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div></div>' +
+        "</form>";
     } else if (step.id === "risque") {
+      var scenarioChoice = (a.risque && a.risque.scenario) || "";
       var v = (a.risque && a.risque.placements) || "";
+      var placementAbc = (a.risque && a.risque.placement_abc) || "";
       contentHtml =
         "<h2>Profil investisseur</h2>" +
         '<p class="step-desc"><strong>Profil de risque</strong></p>' +
-        "<p class=\"step-desc\">En matière de placements financiers, pensez-vous plutôt que :</p>" +
+        '<p class="step-desc">Imaginez que l\'ensemble de vos économies soit investi dans un placement sans risque qui vous rapporte un revenu certain de 20 000 € par an. On vous propose de réallouer votre capital pour l\'investir sur des supports risqués qui ont : une chance sur deux (50 %) de vous procurer un revenu annuel double (40 000 €) ; et une chance sur deux de vous procurer un revenu diminué d\'un tiers (13 333 €).</p>' +
         '<form id="profil-step-form">' +
-        '<div class="profil-choice-group">' +
+        '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
+        '<div class="profil-choice-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">' +
+        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_scenario" value="conserver"' + (scenarioChoice === "conserver" ? " checked" : "") + ' /><span><strong>Je conserve le placement actuel</strong><br/>Garanti · 20 000 € / an</span></label>' +
+        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_scenario" value="accepter"' + (scenarioChoice === "accepter" ? " checked" : "") + ' /><span><strong>J\'accepte le nouveau placement</strong><br/>50 % de chance 40 000 € / an · 50 % de chance 13 333 € / an</span></label>' +
+        "</div></div>" +
+        '<p class="step-desc">En matière de placements financiers, pensez-vous plutôt que :</p>' +
+        '<div class="profil-choice-group" style="margin-bottom: var(--space-lg);">' +
         '<label><input type="radio" name="profil_risque_placements" value="1"' + (v === "1" ? " checked" : "") + " /> Il ne faut pas prendre de risque ; on doit placer toutes ses économies dans des placements sûrs.</label>" +
         '<label><input type="radio" name="profil_risque_placements" value="2"' + (v === "2" ? " checked" : "") + " /> On peut placer une petite partie de ses économies sur des placements risqués.</label>" +
         '<label><input type="radio" name="profil_risque_placements" value="3"' + (v === "3" ? " checked" : "") + " /> On peut placer une part importante de ses économies sur des actifs risqués si le gain en vaut la peine.</label>" +
         '<label><input type="radio" name="profil_risque_placements" value="4"' + (v === "4" ? " checked" : "") + " /> On doit placer l'essentiel de ses économies sur des actifs risqués dès qu'il y a des chances de gains très importants.</label>" +
+        "</div>" +
+        '<p class="step-desc">Le graphique ci-dessous présente 3 placements. Pour chacun d\'eux, sont représentées les estimations de rendement annuel (en %) sur une période de 8 ans, de la plus pessimiste à la plus optimiste. Choisissez le placement qui vous correspond le mieux.</p>' +
+        '<div class="profil-choice-group">' +
+        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="A"' + (placementAbc === "A" ? " checked" : "") + ' /><span><strong>Placement A</strong><br/>Vous souhaitez limiter au maximum le risque de vos investissements, quitte à en limiter la performance.</span></label>' +
+        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="B"' + (placementAbc === "B" ? " checked" : "") + ' /><span><strong>Placement B</strong><br/>Vous acceptez un risque modéré afin de dynamiser la performance de vos placements.</span></label>' +
+        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="C"' + (placementAbc === "C" ? " checked" : "") + ' /><span><strong>Placement C</strong><br/>Vous recherchez une très bonne performance, et acceptez de voir votre capital fluctuer à la baisse durant la durée de votre placement.</span></label>' +
         "</div></form>";
     } else if (step.id === "preferences") {
       var checked = (a.preferences && a.preferences.ne_conviennent) || [];
       var opts = [
-        { id: "preservation", label: "Préservation du capital", desc: "Stratégie prudente pour préserver le capital et éviter les pertes. Ne permet pas d'investir sur le marché action." },
-        { id: "croissance", label: "Croissance du capital", desc: "Objectif d'augmenter le capital avec un risque de perte plus élevé. Permet de s'exposer au marché des actions." },
-        { id: "revenus", label: "Revenus", desc: "Stratégie qui privilégie les placements procurant des revenus (dividendes, coupons...)." },
-        { id: "hedging", label: "Hedging (couverture de risque)", desc: "Stratégie de couverture adaptée aux investisseurs expérimentés." },
-        { id: "levier", label: "Exposition à effet de levier", desc: "Prendre plus de positions que son investissement réel. Gains potentiellement élevés mais risque de perdre plus que la somme investie." },
-        { id: "aucun", label: "Aucun, tous les objectifs proposés peuvent me convenir", desc: "" },
+        { id: "preservation", label: "Préservation du capital", desc: "Stratégie d'investissement prudente dont l'objectif principal est de préserver le capital et d'éviter les pertes au sein d'un portefeuille. Cette stratégie ne permet pas d'investir sur le marché action." },
+        { id: "croissance", label: "Croissance du capital", desc: "Stratégie d'investissement dont l'objectif principal est d'augmenter le capital avec en contrepartie un risque de perte plus élevé. Cette stratégie permet de s'exposer plus ou moins sur le marché des actions." },
+        { id: "revenus", label: "Revenus", desc: "Cette stratégie privilégie les placements qui procurent des revenus (dividendes, coupons, autres revenus distribués...)." },
+        { id: "hedging", label: "Hedging (couverture de risque)", desc: "Une stratégie de Hedging est une stratégie de couverture. Elle consiste à couvrir une position ouverte par une autre position opposée. C'est un objectif de placement adapté uniquement aux investisseurs expérimentés." },
+        { id: "levier", label: "Exposition à effet de levier", desc: "Stratégie d'investissement qui vous permet, contre couverture, de prendre plus de positions sur les marchés que votre investissement réel. Les gains sont potentiellement élevés mais en contrepartie vous risquez de perdre plus que la somme réellement investie." },
+        { id: "aucun", label: "Aucun, tous les objectifs d'investissement proposés peuvent me convenir", desc: "" },
       ];
       contentHtml =
         "<h2>Profil investisseur</h2>" +
-        '<p class="step-desc"><strong>Préférences de placement</strong> — Parmi les objectifs suivants, cochez ceux qui <strong>ne vous conviennent pas</strong> (plusieurs réponses possibles).</p>' +
+        '<p class="step-desc"><strong>Préférences de placement</strong> — Parmi les objectifs d\'investissement suivants, cochez ceux qui ne vous conviennent pas (plusieurs réponses possibles) :</p>' +
         '<form id="profil-step-form"><div class="profil-choice-group">' +
         opts
           .map(function (o) {
@@ -854,28 +1019,31 @@
           .join("") +
         "</div></form>";
     } else if (step.id === "pertes") {
-      var emprunt = (a.pertes && a.pertes.emprunt) || "";
-      var charges = (a.pertes && a.pertes.charges) || "";
+      var revenus = (a.pertes && a.pertes.revenus_foyer) || "";
+      var epargne = (a.pertes && a.pertes.epargne_mensuelle) || "";
       contentHtml =
         "<h2>Profil investisseur</h2>" +
         '<p class="step-desc"><strong>Capacité à subir des pertes</strong></p>' +
         '<form id="profil-step-form">' +
         '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
-        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quel montant d\'emprunt remboursez-vous chaque mois ?</label>' +
+        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quels sont les revenus nets annuels de votre foyer ?</label>' +
         '<div class="profil-choice-group">' +
-        '<label><input type="radio" name="profil_pertes_emprunt" value="0"' + (emprunt === "0" ? " checked" : "") + " /> Je ne suis pas endetté(e)</label>" +
-        '<label><input type="radio" name="profil_pertes_emprunt" value="<500"' + (emprunt === "<500" ? " checked" : "") + " /> Moins de 500 €</label>" +
-        '<label><input type="radio" name="profil_pertes_emprunt" value="500-1000"' + (emprunt === "500-1000" ? " checked" : "") + " /> Entre 500 et 1 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_emprunt" value="1000-2000"' + (emprunt === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_emprunt" value=">2000"' + (emprunt === ">2000" ? " checked" : "") + " /> Plus de 2 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value="<25"' + (revenus === "<25" ? " checked" : "") + " /> Inférieur à 25 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value="25-50"' + (revenus === "25-50" ? " checked" : "") + " /> Entre 25 000 € et 50 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value="50-75"' + (revenus === "50-75" ? " checked" : "") + " /> Entre 50 000 € et 75 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value="75-100"' + (revenus === "75-100" ? " checked" : "") + " /> Entre 75 000 € et 100 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value="100-150"' + (revenus === "100-150" ? " checked" : "") + " /> Entre 100 000 € et 150 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value="150-300"' + (revenus === "150-300" ? " checked" : "") + " /> Entre 150 000 € et 300 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_revenus" value=">300"' + (revenus === ">300" ? " checked" : "") + " /> Plus de 300 000 €</label>" +
         "</div></div>" +
         '<div class="form-group">' +
-        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quel est le montant de vos autres charges fixes mensuelles ?</label>' +
+        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Combien épargnez-vous chaque mois ?</label>' +
         '<div class="profil-choice-group">' +
-        '<label><input type="radio" name="profil_pertes_charges" value="<1000"' + (charges === "<1000" ? " checked" : "") + " /> Moins de 1 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_charges" value="1000-2000"' + (charges === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_charges" value="2000-5000"' + (charges === "2000-5000" ? " checked" : "") + " /> Entre 2 000 € et 5 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_charges" value=">5000"' + (charges === ">5000" ? " checked" : "") + " /> Plus de 5 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_epargne" value="0"' + (epargne === "0" ? " checked" : "") + " /> Je n'épargne pas</label>" +
+        '<label><input type="radio" name="profil_pertes_epargne" value="0-500"' + (epargne === "0-500" ? " checked" : "") + " /> Entre 0 et 500 €</label>" +
+        '<label><input type="radio" name="profil_pertes_epargne" value="500-1000"' + (epargne === "500-1000" ? " checked" : "") + " /> Entre 500 et 1 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_epargne" value="1000-2000"' + (epargne === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_epargne" value=">2000"' + (epargne === ">2000" ? " checked" : "") + " /> Plus de 2 000 €</label>" +
         "</div></div></form>";
     } else if (step.id === "extra") {
       var durabilite = (a.extra && a.extra.durabilite) || "";
@@ -891,22 +1059,25 @@
         '<button type="button" class="profil-ops-btn' + (durabilite === "non" ? " is-selected" : "") + '" data-value="non">Non</button>' +
         "</div></div>" +
         (durabilite === "oui"
-          ? '<div class="form-group"><label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quelle part de votre investissement souhaitez-vous consacrer à des activités environnementales ?</label>' +
+          ? '<div class="form-group" style="margin-bottom: var(--space-lg);"><label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quelle part de votre investissement souhaitez-vous consacrer à des activités environnementales ?</label>' +
             '<div class="profil-choice-group">' +
-            '<label><input type="radio" name="profil_extra_env_percent" value="5"' + (envPercent === "5" ? " checked" : "") + " /> Au moins 5 %</label>" +
-            '<label><input type="radio" name="profil_extra_env_percent" value="25"' + (envPercent === "25" ? " checked" : "") + " /> Au moins 25 %</label>" +
-            '<label><input type="radio" name="profil_extra_env_percent" value="50"' + (envPercent === "50" ? " checked" : "") + " /> Au moins 50 %</label>" +
-            "</div></div>"
+            '<label><input type="radio" name="profil_extra_env_percent" value="5"' + (envPercent === "5" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 5 % de votre investissement.</label>" +
+            '<label><input type="radio" name="profil_extra_env_percent" value="25"' + (envPercent === "25" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 25 % de votre investissement.</label>" +
+            '<label><input type="radio" name="profil_extra_env_percent" value="50"' + (envPercent === "50" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 50 % de votre investissement.</label>" +
+            "</div></div>" +
+            '<p class="about-text">Vous avez indiqué vouloir investir dans des activités environnementales. Les instruments financiers qui correspondent à ce choix font partie de la catégorie Taxonomie. Veuillez noter que ce choix est susceptible d\'impacter la liste des supports dans lesquels vous pourriez investir.</p>'
           : "") +
         "</form>";
     } else {
+      var recapConnaissance = (a.connaissance) ? "Monétaires op. " + (a.connaissance.monetaire_ops || "—") + " ; Obligataires op. " + (a.connaissance.obligataire_ops || "—") + " ; Actions op. " + (a.connaissance.actions_ops || "—") + " ; Défiscalisation " + (a.connaissance.defiscalisation || "—") + " ; Effet de levier " + (a.connaissance.levier || "—") : "—";
+      var recapRisque = (a.risque) ? ["Scénario " + (a.risque.scenario || "—"), "Placements " + (a.risque.placements || "—"), "Placement A/B/C " + (a.risque.placement_abc || "—")].filter(Boolean).join(" ; ") : "—";
       contentHtml =
         "<h2>Profil investisseur</h2>" +
         '<p class="step-desc"><strong>Récapitulatif</strong> — Voici la synthèse de vos réponses.</p>' +
-        '<div class="profil-recap-block"><h3>Connaissance et expérience</h3><p>Produits monétaires : opérations ' + ((a.connaissance && a.connaissance.monetaire_ops) || "—") + " ; Produits obligataires : opérations " + ((a.connaissance && a.connaissance.obligataire_ops) || "—") + ".</p></div>" +
-        '<div class="profil-recap-block"><h3>Profil de risque</h3><p>' + ((a.risque && a.risque.placements) ? "Réponse enregistrée." : "—") + "</p></div>" +
+        '<div class="profil-recap-block"><h3>Connaissance et expérience</h3><p>' + recapConnaissance + "</p></div>" +
+        '<div class="profil-recap-block"><h3>Profil de risque</h3><p>' + recapRisque + "</p></div>" +
         '<div class="profil-recap-block"><h3>Préférences de placement</h3><p>Objectifs ne convenant pas : ' + ((a.preferences && a.preferences.ne_conviennent && a.preferences.ne_conviennent.length) ? a.preferences.ne_conviennent.join(", ") : "Aucun.") + ".</p></div>" +
-        '<div class="profil-recap-block"><h3>Capacité à subir des pertes</h3><p>Emprunt mensuel : ' + ((a.pertes && a.pertes.emprunt) || "—") + " ; Charges fixes : " + ((a.pertes && a.pertes.charges) || "—") + ".</p></div>" +
+        '<div class="profil-recap-block"><h3>Capacité à subir des pertes</h3><p>Revenus foyer : ' + ((a.pertes && a.pertes.revenus_foyer) || "—") + " ; Épargne mensuelle : " + ((a.pertes && a.pertes.epargne_mensuelle) || "—") + ".</p></div>" +
         '<div class="profil-recap-block"><h3>Extra-financier</h3><p>Durabilité : ' + ((a.extra && a.extra.durabilite) || "—") + ((a.extra && a.extra.durabilite === "oui" && a.extra.env_percent) ? " ; Part environnement : " + a.extra.env_percent + " %" : "") + ".</p></div>" +
         '<p class="about-text" style="margin-top: 1rem;">Vous pouvez imprimer cette page (Ctrl+P / Cmd+P) pour conserver un document PDF.</p>';
     }
@@ -928,26 +1099,76 @@
     function collectProfilAnswers() {
       var form = document.getElementById("profil-step-form");
       var out = {};
-      if (step.id === "connaissance" && form) {
+      if (step.id === "intro" && form) {
         var fd = new FormData(form);
+        out.intro = {
+          realise_pour: (fd.get("profil_intro_realise_pour") || "").trim(),
+          represente_par: (fd.get("profil_intro_represente_par") || "").trim(),
+          comprend_objectif: !!form.querySelector('input[name="profil_intro_comprend_objectif"]:checked'),
+        };
+      } else if (step.id === "connaissance" && form) {
+        var fd = new FormData(form);
+        var produitsEls = form.querySelectorAll('input[name="profil_c_produits"]:checked');
+        var modesEls = form.querySelectorAll('input[name="profil_c_modes"]:checked');
+        var avEl = document.querySelector("[data-name='profil_c_assurance_vie'] .profil-ops-btn.is-selected");
+        var peaEl = document.querySelector("[data-name='profil_c_pea'] .profil-ops-btn.is-selected");
+        var erEl = document.querySelector("[data-name='profil_c_epargne_retraite'] .profil-ops-btn.is-selected");
+        var feGlobalEl = document.querySelector("[data-name='profil_c_fonds_euros_global'] .profil-ops-btn.is-selected");
+        var monCb = form.querySelector(".connaissance-checkbox[data-block=\"monetaire\"]");
+        var oblCb = form.querySelector(".connaissance-checkbox[data-block=\"obligataire\"]");
+        var actCb = form.querySelector(".connaissance-checkbox[data-block=\"actions\"]");
+        var feCb = form.querySelector(".connaissance-checkbox[data-block=\"fonds_euros\"]");
+        var feOpsEl = document.querySelector("[data-name='profil_connaissance_fonds_euros_ops'] .profil-ops-btn.is-selected");
         var monOpsEl = document.querySelector("[data-name='profil_connaissance_monetaire_ops'] .profil-ops-btn.is-selected");
         var oblOpsEl = document.querySelector("[data-name='profil_connaissance_obligataire_ops'] .profil-ops-btn.is-selected");
+        var actOpsEl = document.querySelector("[data-name='profil_connaissance_actions_ops'] .profil-ops-btn.is-selected");
+        var defiscEl = document.querySelector("[data-name='profil_connaissance_defiscalisation'] .profil-ops-btn.is-selected");
+        var levierEl = document.querySelector("[data-name='profil_connaissance_levier'] .profil-ops-btn.is-selected");
+        var pertesSubiesEl = document.querySelector("[data-name='profil_c_pertes_subies'] .profil-ops-btn.is-selected");
         out.connaissance = {
+          produits_detenus: produitsEls ? Array.prototype.map.call(produitsEls, function (el) { return el.value; }) : [],
+          modes_gestion: modesEls ? Array.prototype.map.call(modesEls, function (el) { return el.value; }) : [],
+          assurance_vie_oui: avEl ? avEl.getAttribute("data-value") : "",
+          av_affirm1: fd.get("profil_c_av_affirm1") || "",
+          av_affirm2: fd.get("profil_c_av_affirm2") || "",
+          pea_oui: peaEl ? peaEl.getAttribute("data-value") : "",
+          pea_affirm1: fd.get("profil_c_pea_affirm1") || "",
+          pea_affirm2: fd.get("profil_c_pea_affirm2") || "",
+          epargne_retraite_oui: erEl ? erEl.getAttribute("data-value") : "",
+          fonds_euros_oui: feGlobalEl ? feGlobalEl.getAttribute("data-value") : "",
+          fonds_euros_checked: feCb ? feCb.checked : false,
+          fonds_euros_affirm: fd.get("profil_connaissance_fonds_euros_affirm") || "",
+          fonds_euros_ops: feOpsEl ? feOpsEl.getAttribute("data-value") : "",
+          monetaire_checked: monCb ? monCb.checked : false,
+          obligataire_checked: oblCb ? oblCb.checked : false,
+          actions_checked: actCb ? actCb.checked : false,
           monetaire_affirm: fd.get("profil_connaissance_monetaire_affirm") || "",
           monetaire_ops: monOpsEl ? monOpsEl.getAttribute("data-value") : "",
           obligataire_affirm: fd.get("profil_connaissance_obligataire_affirm") || "",
           obligataire_ops: oblOpsEl ? oblOpsEl.getAttribute("data-value") : "",
+          actions_affirm: fd.get("profil_connaissance_actions_affirm") || "",
+          actions_ops: actOpsEl ? actOpsEl.getAttribute("data-value") : "",
+          defiscalisation: defiscEl ? defiscEl.getAttribute("data-value") : "",
+          levier: levierEl ? levierEl.getAttribute("data-value") : "",
+          montant_transaction: fd.get("profil_c_montant_transaction") || "",
+          pertes_subies: pertesSubiesEl ? pertesSubiesEl.getAttribute("data-value") : "",
         };
       } else if (step.id === "risque" && form) {
+        var sc = form.querySelector('input[name="profil_risque_scenario"]:checked');
         var r = form.querySelector('input[name="profil_risque_placements"]:checked');
-        out.risque = { placements: r ? r.value : "" };
+        var abc = form.querySelector('input[name="profil_risque_placement_abc"]:checked');
+        out.risque = {
+          scenario: sc ? sc.value : "",
+          placements: r ? r.value : "",
+          placement_abc: abc ? abc.value : "",
+        };
       } else if (step.id === "preferences" && form) {
         var checkboxes = form.querySelectorAll('input[name="profil_preferences_ne_conviennent"]:checked');
         out.preferences = { ne_conviennent: checkboxes ? Array.prototype.map.call(checkboxes, function (el) { return el.value; }) : [] };
       } else if (step.id === "pertes" && form) {
-        var e = form.querySelector('input[name="profil_pertes_emprunt"]:checked');
-        var c = form.querySelector('input[name="profil_pertes_charges"]:checked');
-        out.pertes = { emprunt: e ? e.value : "", charges: c ? c.value : "" };
+        var rev = form.querySelector('input[name="profil_pertes_revenus"]:checked');
+        var ep = form.querySelector('input[name="profil_pertes_epargne"]:checked');
+        out.pertes = { revenus_foyer: rev ? rev.value : "", epargne_mensuelle: ep ? ep.value : "" };
       } else if (step.id === "extra" && form) {
         var dEl = document.querySelector("[data-name='profil_extra_durabilite'] .profil-ops-btn.is-selected");
         var envEl = form.querySelector('input[name="profil_extra_env_percent"]:checked');
@@ -961,6 +1182,27 @@
         var group = this.closest("[data-name]");
         if (group) group.querySelectorAll(".profil-ops-btn").forEach(function (b) { b.classList.remove("is-selected"); });
         this.classList.add("is-selected");
+        var name = group && group.getAttribute("data-name");
+        var isOui = this.getAttribute("data-value") === "oui";
+        var followup = name && document.querySelector(".connaissance-followup[data-followup=\"" + name.replace("profil_c_", "").replace("profil_connaissance_", "") + "\"]");
+        if (name === "profil_c_assurance_vie") followup = document.querySelector(".connaissance-followup[data-followup=\"assurance_vie\"]");
+        else if (name === "profil_c_pea") followup = document.querySelector(".connaissance-followup[data-followup=\"pea\"]");
+        else if (name === "profil_c_epargne_retraite") followup = document.querySelector(".connaissance-followup[data-followup=\"epargne_retraite\"]");
+        else if (name === "profil_c_fonds_euros_global") {
+          document.querySelectorAll(".connaissance-block-content[data-block=\"fonds_euros_global\"], .connaissance-fonds-euros-reveal").forEach(function (el) { el.style.display = isOui ? "block" : "none"; });
+          followup = null;
+        }
+        else if (name === "profil_connaissance_defiscalisation") followup = document.querySelector(".connaissance-followup[data-followup=\"defiscalisation\"]");
+        else if (name === "profil_connaissance_levier") followup = document.querySelector(".connaissance-followup[data-followup=\"levier\"]");
+        else if (name === "profil_c_pertes_subies") followup = null;
+        if (followup) followup.style.display = isOui ? "block" : "none";
+      });
+    });
+    document.querySelectorAll(".connaissance-checkbox").forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        var block = this.getAttribute("data-block");
+        var content = document.querySelector(".connaissance-block-content[data-block=\"" + block + "\"]");
+        if (content) content.style.display = this.checked ? "block" : "none";
       });
     });
 

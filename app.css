@@ -391,6 +391,93 @@
   margin: 0;
 }
 
+.profil-scenario-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.profil-scenario-card span {
+  flex: 1;
+  line-height: 1.5;
+}
+
+/* Connaissance : checkbox ouvre la séquence de questions */
+.connaissance-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin-bottom: 0.25rem;
+}
+.connaissance-toggle input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.connaissance-block-content {
+  display: none;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+.connaissance-followup {
+  margin-top: 0.5rem;
+}
+
+.profil-wizard .step-list {
+  margin: 0.75rem 0 1rem 1.25rem;
+  padding: 0;
+}
+.profil-wizard .form-group {
+  margin-bottom: 1rem;
+}
+.profil-wizard .form-group label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+.profil-wizard .form-control {
+  width: 100%;
+  max-width: 24rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+.profil-wizard .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: normal;
+  cursor: pointer;
+}
+.profil-wizard .info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+.profil-scenario-card:hover {
+  border-color: rgba(26, 95, 180, 0.3);
+}
+.profil-scenario-card:has(input:checked) {
+  border-color: #1a5fb4;
+  background: rgba(26, 95, 180, 0.06);
+}
+@media (max-width: 600px) {
+  .profil-wizard-content [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 @media (max-width: 900px) {
   .app-grid-3 {
     grid-template-columns: 1fr;
