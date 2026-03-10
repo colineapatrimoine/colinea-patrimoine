@@ -238,6 +238,159 @@
   color: var(--color-accent);
 }
 
+/* ===== Profil investisseur — wizard ===== */
+.profil-wizard {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-xl);
+  align-items: start;
+  margin-top: var(--space-md);
+}
+.profil-wizard-sidebar {
+  position: sticky;
+  top: 100px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  box-shadow: 0 2px 12px var(--color-shadow);
+}
+.profil-wizard-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: default;
+}
+.profil-wizard-step.is-done {
+  color: var(--color-text);
+}
+.profil-wizard-step.is-active {
+  color: #1a5fb4;
+  font-weight: 600;
+}
+.profil-wizard-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-bg-soft);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.profil-wizard-step.is-done .profil-wizard-step-num,
+.profil-wizard-step.is-active .profil-wizard-step-num {
+  background: #1a5fb4;
+  color: #fff;
+}
+.profil-wizard-content {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-lg);
+  box-shadow: 0 2px 12px var(--color-shadow);
+}
+.profil-wizard-content h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+.profil-wizard-content .step-desc {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+.profil-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.profil-choice-group label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.profil-choice-group label:hover {
+  border-color: rgba(26, 95, 180, 0.3);
+}
+.profil-choice-group input:checked + span,
+.profil-choice-group label:has(input:checked) {
+  border-color: #1a5fb4;
+  background: rgba(26, 95, 180, 0.06);
+}
+.profil-choice-group input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+.profil-ops-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.profil-ops-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.profil-ops-btn.is-selected {
+  border-color: #1a5fb4;
+  background: rgba(26, 95, 180, 0.08);
+  color: #1a5fb4;
+}
+.profil-wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+.profil-wizard-actions .btn-primary {
+  background: #1a5fb4;
+  border-color: #1a5fb4;
+}
+.profil-wizard-actions .btn-primary:hover {
+  background: #1554a0;
+  border-color: #1554a0;
+}
+.profil-recap-block {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--color-bg-soft);
+  border-radius: var(--radius);
+}
+.profil-recap-block h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.profil-recap-block p {
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .app-grid-3 {
     grid-template-columns: 1fr;
@@ -247,6 +400,12 @@
   }
   .app-form {
     grid-template-columns: 1fr;
+  }
+  .profil-wizard {
+    grid-template-columns: 1fr;
+  }
+  .profil-wizard-sidebar {
+    position: static;
   }
 }
 

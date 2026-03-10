@@ -2,7 +2,7 @@
   const LS_KEY = "colinea_outil_v1";
   const GATE_KEY = "colinea_app_unlocked";
   /** Code d'accès à l'espace interne — change-le ici si tu veux */
-  const APP_CODE = "colinea";
+  const APP_CODE = "Colin1703";
 
   const gateEl = document.getElementById("app-gate");
   const wrapEl = document.getElementById("app-wrap");
@@ -62,22 +62,96 @@
   }
 
   const SIMULATORS = [
-    { id: "bilan", title: "Bilan patrimonial (synthèse)", desc: "Structurer les actifs, passifs, flux et objectifs." },
-    { id: "capacite-epargne", title: "Capacité d’épargne", desc: "Estimer le reste à vivre et l’épargne mensuelle." },
-    { id: "objectif-capital", title: "Objectif capital", desc: "Capital cible vs effort d’épargne et horizon." },
-    { id: "retirement", title: "Retraite (projection)", desc: "Âge de départ, revenus, besoin et écarts." },
-    { id: "assurance-vie", title: "Assurance-vie (arbitrages)", desc: "Scénarios de versements et performance." },
-    { id: "pea", title: "PEA (projection)", desc: "Hypothèses de rendement et effort de versement." },
-    { id: "immo-locatif", title: "Immobilier locatif", desc: "Cash-flow, rendement, fiscalité (simplifié)." },
-    { id: "pinel-denormandie", title: "Dispositif immobilier", desc: "Réduction d’impôt et effort net (à définir)." },
-    { id: "lmnp", title: "LMNP (simplifié)", desc: "BIC, amortissements (à définir)." },
-    { id: "revenus-fonciers", title: "Revenus fonciers", desc: "Micro-foncier / réel (à définir)." },
-    { id: "ir", title: "Impôt sur le revenu (simplifié)", desc: "Estimation indicative (à définir)." },
-    { id: "ifi", title: "IFI (simplifié)", desc: "Assiette immobilière et estimation (à définir)." },
-    { id: "donation", title: "Donation", desc: "Abattements et droits (à définir)." },
-    { id: "succession", title: "Succession", desc: "Estimation des droits (à définir)." },
-    { id: "prevoyance", title: "Prévoyance (besoin)", desc: "Capital décès / rente (à définir)." },
-    { id: "etudes", title: "Financement études", desc: "Objectif, horizon, effort mensuel." },
+    {
+      id: "profil-investisseur",
+      title: "Profil investisseur complet",
+      desc: "Évaluer les préférences de placement financier, y compris les critères ESG.",
+    },
+    {
+      id: "assurance-vie",
+      title: "Simulateur assurance vie",
+      desc: "Étudier la valorisation d’un contrat d’assurance vie et l’impact des rachats ou de la sortie en rentes.",
+    },
+    {
+      id: "immobilier",
+      title: "Simulateur Immobilier",
+      desc: "Simuler un investissement immobilier en location nue ou meublée.",
+    },
+    {
+      id: "per",
+      title: "Simulateur PER",
+      desc: "Estimer l’incidence de la mise en place d’un PER et de sa sortie.",
+    },
+    {
+      id: "ir-diagnostic",
+      title: "Diagnostic Impôt sur le revenu",
+      desc: "Calculer rapidement l’impôt sur le revenu et tester des pistes d’optimisation.",
+    },
+    {
+      id: "credit",
+      title: "Simulateur Crédit",
+      desc: "Effectuer une simulation de prêt (mensualités, durée, coût total).",
+    },
+    {
+      id: "statut-dirigeant",
+      title: "Diagnostic statut et rémunération du dirigeant",
+      desc: "Comparer les effets d’un changement de statut et l’arbitrage salaire / dividendes.",
+    },
+    {
+      id: "retraite",
+      title: "Diagnostic Retraite",
+      desc: "Évaluer rapidement le montant estimatif de la pension de retraite.",
+    },
+    {
+      id: "sci",
+      title: "Simulateur SCI",
+      desc: "Comparer une SCI à l’IR et à l’IS pour un bien locatif.",
+    },
+    {
+      id: "succession",
+      title: "Diagnostic Succession",
+      desc: "Estimer la transmission et les droits de succession à partir d’une situation simplifiée.",
+    },
+    {
+      id: "ifi",
+      title: "Diagnostic Impôt sur la fortune immobilière",
+      desc: "Effectuer un calcul indicatif de l’IFI et analyser des leviers d’optimisation.",
+    },
+    {
+      id: "plus-values-immo",
+      title: "Fiscalité des plus-values immobilières",
+      desc: "Calculer la plus-value immobilière et l’impôt correspondant.",
+    },
+    {
+      id: "capacite-acquisition",
+      title: "Simulateur Capacité d’Acquisition",
+      desc: "Estimer la capacité d’emprunt et le budget d’acquisition immobilier.",
+    },
+    {
+      id: "rente-viagere",
+      title: "Simulateur Rente Viagère",
+      desc: "Estimer la rente ou le capital à constituer pour une rente souhaitée.",
+    },
+    {
+      id: "epargne",
+      title: "Simulateur Epargne",
+      desc: "Projeter rapidement l’évolution d’une épargne dans le temps.",
+    },
+    {
+      id: "frais-notaire",
+      title: "Simulateur Frais de notaire",
+      desc: "Estimer les frais de notaire liés à l’acquisition d’un bien immobilier.",
+    },
+  ];
+
+  const PROFIL_INVESTISSEUR_STEPS = [
+    { id: "intro", title: "Introduction" },
+    { id: "connaissance", title: "Connaissance et Expérience" },
+    { id: "risque", title: "Profil de risque" },
+    { id: "preferences", title: "Préférences de placement" },
+    { id: "pertes", title: "Capacité à subir des pertes" },
+    { id: "extra", title: "Profil investisseur extra-financier" },
+    { id: "recap", title: "Récapitulatif" },
   ];
 
   function uid(prefix) {
@@ -654,6 +728,265 @@
     });
   }
 
+  function viewProfilInvestisseur(params, sim, client) {
+    const hashBase = "#/simulateur?id=profil-investisseur" + (client ? "&clientId=" + encodeURIComponent(client.id) : "");
+    window.__profilInvestisseurState = window.__profilInvestisseurState || { stepIndex: 0, answers: {} };
+    const st = window.__profilInvestisseurState;
+    if (st.reset) {
+      st.stepIndex = 0;
+      st.answers = {};
+      st.reset = false;
+    }
+    const stepIndex = Math.min(st.stepIndex, PROFIL_INVESTISSEUR_STEPS.length - 1);
+    const step = PROFIL_INVESTISSEUR_STEPS[stepIndex];
+    const a = st.answers;
+
+    setTitle(sim.title, sim.desc);
+    setActions(
+      '<a class="btn btn-outline" href="#/simulations' + (client ? "?clientId=" + encodeURIComponent(client.id) : "") + '">Retour</a>' +
+      (client ? '<span class="pill pill-accent">Client : ' + escapeHtml((client.prenom ? client.prenom + " " : "") + (client.nom || "")) + "</span>" : "")
+    );
+
+    const sidebarHtml =
+      '<nav class="profil-wizard-sidebar" aria-label="Étapes du profil investisseur">' +
+      PROFIL_INVESTISSEUR_STEPS.map(function (s, i) {
+        return (
+          '<div class="profil-wizard-step ' +
+          (i < stepIndex ? "is-done" : "") +
+          (i === stepIndex ? " is-active" : "") +
+          '" data-step="' +
+          i +
+          '"><span class="profil-wizard-step-num">' +
+          (i < stepIndex ? "✓" : i + 1) +
+          "</span><span>" +
+          escapeHtml(s.title) +
+          "</span></div>"
+        );
+      }).join("") +
+      "</nav>";
+
+    var contentHtml = "";
+    if (step.id === "intro") {
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc">Ce questionnaire permet d\'évaluer vos préférences de placement, votre connaissance des marchés financiers et votre sensibilité au risque. Répondez de manière spontanée ; il n\'y a pas de « bonne » réponse.</p>' +
+        "<p class=\"step-desc\">Vous pourrez à tout moment revenir en arrière ou fermer sans enregistrer.</p>";
+    } else if (step.id === "connaissance") {
+      var monOps = (a.connaissance && a.connaissance.monetaire_ops) || "";
+      var oblOps = (a.connaissance && a.connaissance.obligataire_ops) || "";
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc"><strong>Connaissance et Expérience</strong> — Pour chaque type de produit, indiquez votre niveau de connaissance et le nombre d\'opérations réalisées au cours des 12 derniers mois.</p>' +
+        '<form id="profil-step-form">' +
+        '<div class="app-card" style="margin-bottom: var(--space-lg);">' +
+        '<h3 class="about-subtitle" style="margin-top: 0;">Produits monétaires</h3>' +
+        "<p class=\"about-text\" style=\"margin-bottom: 0.75rem;\">(Fonds monétaires, OPC monétaires)</p>" +
+        '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group" style="margin-bottom: 1rem;">' +
+        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="1" /> Les fonds monétaires sont composés principalement de TCN, bons du Trésor et obligations à court terme.</label>' +
+        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="2" /> L\'investissement sur des OPC monétaires est parfaitement adapté pour un investissement de long terme.</label>' +
+        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="3" /> En investissant sur des fonds monétaires, le capital est garanti.</label>' +
+        '<label><input type="radio" name="profil_connaissance_monetaire_affirm" value="4" /> Je ne sais pas.</label>' +
+        "</div>" +
+        '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Opérations réalisées au cours des 12 derniers mois :</p>' +
+        '<div class="profil-ops-group" data-name="profil_connaissance_monetaire_ops">' +
+        '<button type="button" class="profil-ops-btn' + (monOps === "0" ? " is-selected" : "") + '" data-value="0">Aucune</button>' +
+        '<button type="button" class="profil-ops-btn' + (monOps === "1-5" ? " is-selected" : "") + '" data-value="1-5">De 1 à 5</button>' +
+        '<button type="button" class="profil-ops-btn' + (monOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button>' +
+        "</div></div>" +
+        '<div class="app-card">' +
+        "<h3 class=\"about-subtitle\" style=\"margin-top: 0;\">Produits obligataires</h3>" +
+        "<p class=\"about-text\" style=\"margin-bottom: 0.75rem;\">(Obligations, fonds obligataires, titres de créance...)</p>" +
+        '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Affirmeriez-vous plutôt :</p>' +
+        '<div class="profil-choice-group" style="margin-bottom: 1rem;">' +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="1" /> Les obligations sont des dettes pour lesquelles le défaut de remboursement est inexistant.</label>' +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="2" /> Pour une obligation, un taux élevé indique un risque faible.</label>' +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="3" /> La performance d\'un fonds obligataire varie avec les évolutions des taux d\'intérêt.</label>' +
+        '<label><input type="radio" name="profil_connaissance_obligataire_affirm" value="4" /> Je ne sais pas.</label>' +
+        "</div>" +
+        '<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Opérations réalisées au cours des 12 derniers mois :</p>' +
+        '<div class="profil-ops-group" data-name="profil_connaissance_obligataire_ops">' +
+        '<button type="button" class="profil-ops-btn' + (oblOps === "0" ? " is-selected" : "") + '" data-value="0">Aucune</button>' +
+        '<button type="button" class="profil-ops-btn' + (oblOps === "1-5" ? " is-selected" : "") + '" data-value="1-5">De 1 à 5</button>' +
+        '<button type="button" class="profil-ops-btn' + (oblOps === "5+" ? " is-selected" : "") + '" data-value="5+">Plus de 5</button>' +
+        "</div></div></form>";
+    } else if (step.id === "risque") {
+      var v = (a.risque && a.risque.placements) || "";
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc"><strong>Profil de risque</strong></p>' +
+        "<p class=\"step-desc\">En matière de placements financiers, pensez-vous plutôt que :</p>" +
+        '<form id="profil-step-form">' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_risque_placements" value="1"' + (v === "1" ? " checked" : "") + " /> Il ne faut pas prendre de risque ; on doit placer toutes ses économies dans des placements sûrs.</label>" +
+        '<label><input type="radio" name="profil_risque_placements" value="2"' + (v === "2" ? " checked" : "") + " /> On peut placer une petite partie de ses économies sur des placements risqués.</label>" +
+        '<label><input type="radio" name="profil_risque_placements" value="3"' + (v === "3" ? " checked" : "") + " /> On peut placer une part importante de ses économies sur des actifs risqués si le gain en vaut la peine.</label>" +
+        '<label><input type="radio" name="profil_risque_placements" value="4"' + (v === "4" ? " checked" : "") + " /> On doit placer l'essentiel de ses économies sur des actifs risqués dès qu'il y a des chances de gains très importants.</label>" +
+        "</div></form>";
+    } else if (step.id === "preferences") {
+      var checked = (a.preferences && a.preferences.ne_conviennent) || [];
+      var opts = [
+        { id: "preservation", label: "Préservation du capital", desc: "Stratégie prudente pour préserver le capital et éviter les pertes. Ne permet pas d'investir sur le marché action." },
+        { id: "croissance", label: "Croissance du capital", desc: "Objectif d'augmenter le capital avec un risque de perte plus élevé. Permet de s'exposer au marché des actions." },
+        { id: "revenus", label: "Revenus", desc: "Stratégie qui privilégie les placements procurant des revenus (dividendes, coupons...)." },
+        { id: "hedging", label: "Hedging (couverture de risque)", desc: "Stratégie de couverture adaptée aux investisseurs expérimentés." },
+        { id: "levier", label: "Exposition à effet de levier", desc: "Prendre plus de positions que son investissement réel. Gains potentiellement élevés mais risque de perdre plus que la somme investie." },
+        { id: "aucun", label: "Aucun, tous les objectifs proposés peuvent me convenir", desc: "" },
+      ];
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc"><strong>Préférences de placement</strong> — Parmi les objectifs suivants, cochez ceux qui <strong>ne vous conviennent pas</strong> (plusieurs réponses possibles).</p>' +
+        '<form id="profil-step-form"><div class="profil-choice-group">' +
+        opts
+          .map(function (o) {
+            return (
+              '<label><input type="checkbox" name="profil_preferences_ne_conviennent" value="' +
+              escapeHtml(o.id) +
+              '"' +
+              (checked.indexOf(o.id) !== -1 ? " checked" : "") +
+              " /><span><strong>" +
+              escapeHtml(o.label) +
+              "</strong>" +
+              (o.desc ? " — " + escapeHtml(o.desc) : "") +
+              "</span></label>"
+            );
+          })
+          .join("") +
+        "</div></form>";
+    } else if (step.id === "pertes") {
+      var emprunt = (a.pertes && a.pertes.emprunt) || "";
+      var charges = (a.pertes && a.pertes.charges) || "";
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc"><strong>Capacité à subir des pertes</strong></p>' +
+        '<form id="profil-step-form">' +
+        '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
+        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quel montant d\'emprunt remboursez-vous chaque mois ?</label>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_pertes_emprunt" value="0"' + (emprunt === "0" ? " checked" : "") + " /> Je ne suis pas endetté(e)</label>" +
+        '<label><input type="radio" name="profil_pertes_emprunt" value="<500"' + (emprunt === "<500" ? " checked" : "") + " /> Moins de 500 €</label>" +
+        '<label><input type="radio" name="profil_pertes_emprunt" value="500-1000"' + (emprunt === "500-1000" ? " checked" : "") + " /> Entre 500 et 1 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_emprunt" value="1000-2000"' + (emprunt === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_emprunt" value=">2000"' + (emprunt === ">2000" ? " checked" : "") + " /> Plus de 2 000 €</label>" +
+        "</div></div>" +
+        '<div class="form-group">' +
+        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quel est le montant de vos autres charges fixes mensuelles ?</label>' +
+        '<div class="profil-choice-group">' +
+        '<label><input type="radio" name="profil_pertes_charges" value="<1000"' + (charges === "<1000" ? " checked" : "") + " /> Moins de 1 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_charges" value="1000-2000"' + (charges === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_charges" value="2000-5000"' + (charges === "2000-5000" ? " checked" : "") + " /> Entre 2 000 € et 5 000 €</label>" +
+        '<label><input type="radio" name="profil_pertes_charges" value=">5000"' + (charges === ">5000" ? " checked" : "") + " /> Plus de 5 000 €</label>" +
+        "</div></div></form>";
+    } else if (step.id === "extra") {
+      var durabilite = (a.extra && a.extra.durabilite) || "";
+      var envPercent = (a.extra && a.extra.env_percent) || "";
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc"><strong>Profil investisseur extra-financier</strong> — Critères ESG et durabilité.</p>' +
+        '<form id="profil-step-form">' +
+        '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
+        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Souhaitez-vous préciser vos préférences en matière de durabilité ?</label>' +
+        '<div class="profil-ops-group" data-name="profil_extra_durabilite">' +
+        '<button type="button" class="profil-ops-btn' + (durabilite === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+        '<button type="button" class="profil-ops-btn' + (durabilite === "non" ? " is-selected" : "") + '" data-value="non">Non</button>' +
+        "</div></div>" +
+        (durabilite === "oui"
+          ? '<div class="form-group"><label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quelle part de votre investissement souhaitez-vous consacrer à des activités environnementales ?</label>' +
+            '<div class="profil-choice-group">' +
+            '<label><input type="radio" name="profil_extra_env_percent" value="5"' + (envPercent === "5" ? " checked" : "") + " /> Au moins 5 %</label>" +
+            '<label><input type="radio" name="profil_extra_env_percent" value="25"' + (envPercent === "25" ? " checked" : "") + " /> Au moins 25 %</label>" +
+            '<label><input type="radio" name="profil_extra_env_percent" value="50"' + (envPercent === "50" ? " checked" : "") + " /> Au moins 50 %</label>" +
+            "</div></div>"
+          : "") +
+        "</form>";
+    } else {
+      contentHtml =
+        "<h2>Profil investisseur</h2>" +
+        '<p class="step-desc"><strong>Récapitulatif</strong> — Voici la synthèse de vos réponses.</p>' +
+        '<div class="profil-recap-block"><h3>Connaissance et expérience</h3><p>Produits monétaires : opérations ' + ((a.connaissance && a.connaissance.monetaire_ops) || "—") + " ; Produits obligataires : opérations " + ((a.connaissance && a.connaissance.obligataire_ops) || "—") + ".</p></div>" +
+        '<div class="profil-recap-block"><h3>Profil de risque</h3><p>' + ((a.risque && a.risque.placements) ? "Réponse enregistrée." : "—") + "</p></div>" +
+        '<div class="profil-recap-block"><h3>Préférences de placement</h3><p>Objectifs ne convenant pas : ' + ((a.preferences && a.preferences.ne_conviennent && a.preferences.ne_conviennent.length) ? a.preferences.ne_conviennent.join(", ") : "Aucun.") + ".</p></div>" +
+        '<div class="profil-recap-block"><h3>Capacité à subir des pertes</h3><p>Emprunt mensuel : ' + ((a.pertes && a.pertes.emprunt) || "—") + " ; Charges fixes : " + ((a.pertes && a.pertes.charges) || "—") + ".</p></div>" +
+        '<div class="profil-recap-block"><h3>Extra-financier</h3><p>Durabilité : ' + ((a.extra && a.extra.durabilite) || "—") + ((a.extra && a.extra.durabilite === "oui" && a.extra.env_percent) ? " ; Part environnement : " + a.extra.env_percent + " %" : "") + ".</p></div>" +
+        '<p class="about-text" style="margin-top: 1rem;">Vous pouvez imprimer cette page (Ctrl+P / Cmd+P) pour conserver un document PDF.</p>';
+    }
+
+    var isFirst = stepIndex === 0;
+    var isLast = stepIndex === PROFIL_INVESTISSEUR_STEPS.length - 1;
+    var actionsHtml =
+      '<div class="profil-wizard-actions">' +
+      '<div>' +
+      (!isFirst ? '<button type="button" class="btn btn-outline" id="profil-prev">← Revenir à l\'étape précédente</button>' : "") +
+      "</div>" +
+      '<div style="display: flex; gap: 0.5rem;">' +
+      '<button type="button" class="btn btn-outline" id="profil-close">Fermer</button>' +
+      (isLast ? '<button type="button" class="btn btn-primary" id="profil-pdf">Générer le PDF</button>' : '<button type="button" class="btn btn-primary" id="profil-next">Étape suivante →</button>') +
+      "</div></div>";
+
+    render('<section class="profil-wizard">' + sidebarHtml + '<div class="profil-wizard-content">' + contentHtml + actionsHtml + "</div></section>");
+
+    function collectProfilAnswers() {
+      var form = document.getElementById("profil-step-form");
+      var out = {};
+      if (step.id === "connaissance" && form) {
+        var fd = new FormData(form);
+        var monOpsEl = document.querySelector("[data-name='profil_connaissance_monetaire_ops'] .profil-ops-btn.is-selected");
+        var oblOpsEl = document.querySelector("[data-name='profil_connaissance_obligataire_ops'] .profil-ops-btn.is-selected");
+        out.connaissance = {
+          monetaire_affirm: fd.get("profil_connaissance_monetaire_affirm") || "",
+          monetaire_ops: monOpsEl ? monOpsEl.getAttribute("data-value") : "",
+          obligataire_affirm: fd.get("profil_connaissance_obligataire_affirm") || "",
+          obligataire_ops: oblOpsEl ? oblOpsEl.getAttribute("data-value") : "",
+        };
+      } else if (step.id === "risque" && form) {
+        var r = form.querySelector('input[name="profil_risque_placements"]:checked');
+        out.risque = { placements: r ? r.value : "" };
+      } else if (step.id === "preferences" && form) {
+        var checkboxes = form.querySelectorAll('input[name="profil_preferences_ne_conviennent"]:checked');
+        out.preferences = { ne_conviennent: checkboxes ? Array.prototype.map.call(checkboxes, function (el) { return el.value; }) : [] };
+      } else if (step.id === "pertes" && form) {
+        var e = form.querySelector('input[name="profil_pertes_emprunt"]:checked');
+        var c = form.querySelector('input[name="profil_pertes_charges"]:checked');
+        out.pertes = { emprunt: e ? e.value : "", charges: c ? c.value : "" };
+      } else if (step.id === "extra" && form) {
+        var dEl = document.querySelector("[data-name='profil_extra_durabilite'] .profil-ops-btn.is-selected");
+        var envEl = form.querySelector('input[name="profil_extra_env_percent"]:checked');
+        out.extra = { durabilite: dEl ? dEl.getAttribute("data-value") : "", env_percent: envEl ? envEl.value : "" };
+      }
+      return out;
+    }
+
+    document.querySelectorAll(".profil-ops-group button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var group = this.closest("[data-name]");
+        if (group) group.querySelectorAll(".profil-ops-btn").forEach(function (b) { b.classList.remove("is-selected"); });
+        this.classList.add("is-selected");
+      });
+    });
+
+    var prevBtn = document.getElementById("profil-prev");
+    if (prevBtn) prevBtn.addEventListener("click", function () { st.stepIndex = Math.max(0, stepIndex - 1); window.location.hash = hashBase; route(); });
+    document.getElementById("profil-close").addEventListener("click", function () {
+      st.reset = true;
+      window.location.hash = "#/simulations" + (client ? "?clientId=" + encodeURIComponent(client.id) : "");
+      route();
+    });
+    var nextBtn = document.getElementById("profil-next");
+    if (nextBtn)
+      nextBtn.addEventListener("click", function () {
+        var collected = collectProfilAnswers();
+        Object.keys(collected).forEach(function (k) {
+          st.answers[k] = st.answers[k] || {};
+          Object.keys(collected[k]).forEach(function (key) { st.answers[k][key] = collected[k][key]; });
+        });
+        st.stepIndex = stepIndex + 1;
+        window.location.hash = hashBase;
+        route();
+      });
+    var pdfBtn = document.getElementById("profil-pdf");
+    if (pdfBtn) pdfBtn.addEventListener("click", function () { window.print(); });
+  }
+
   function viewSimulator(params) {
     const id = params.get("id");
     const clientId = params.get("clientId") || "";
@@ -665,6 +998,11 @@
       setTitle("Simulateur introuvable", "Ce simulateur n’existe pas.");
       setActions(`<a class="btn btn-outline" href="#/simulations">Retour</a>`);
       render(`<section class="app-card"><p class="about-text">Impossible d’ouvrir ce simulateur.</p></section>`);
+      return;
+    }
+
+    if (id === "profil-investisseur") {
+      viewProfilInvestisseur(params, sim, client);
       return;
     }
 
