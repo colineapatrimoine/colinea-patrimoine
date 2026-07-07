@@ -247,6 +247,10 @@
     form.composition = Math.round(Math.min(100, Math.max(0, (uc - 10) / 0.8)));
   }
 
+  function roundAv2(n) {
+    return Math.round(Number(n) * 100) / 100;
+  }
+
   function getAbattementMaxAv(form) {
     return form.situationFiscale === "couple" ? AV_ABATTEMENT_COUPLE : AV_ABATTEMENT_CELIB;
   }
@@ -306,30 +310,26 @@
     var abattApres = abatt * (1 - ratioAvant);
     var tauxAvant = getTauxIRPartAv(ctx.ageAns, ctx.encoursTotal, ctx.choixAvant, ctx.connaitFiscalite, false);
     var tauxApres = getTauxIRPartAv(ctx.ageAns, ctx.encoursTotal, ctx.choixApres, ctx.connaitFiscalite, true);
+    var pfoBrut = pvAvant * tauxAvant + pvApres * tauxApres;
     var pvImpAvant = Math.max(0, pvAvant - abattAvant);
     var pvImpApres = Math.max(0, pvApres - abattApres);
-    var irAvant = pvImpAvant * tauxAvant;
-    var irApres = pvImpApres * tauxApres;
-    var pfo = irAvant + irApres;
-    var irCredit = 0;
-    if (pvImpAvant + pvImpApres <= 0 && pv > 0) {
-      pfo = pvAvant * tauxAvant + pvApres * tauxApres;
-      irCredit = -pfo;
-    }
-    var psEuroPart = Math.max(0, pv * ctx.ratioEuro * AV_PS - ctx.psEuroDejaPayesSurPart);
-    var psUcPart = Math.max(0, pv * ctx.ratioUC * AV_PS);
-    var ps = psEuroPart + psUcPart;
-    var impotNet = Math.max(0, pfo + irCredit);
+    var impotDu = pvImpAvant * tauxAvant + pvImpApres * tauxApres;
+    var irCredit = impotDu - pfoBrut;
+    if (irCredit > 0) irCredit = 0;
+    var impotNet = Math.max(0, impotDu);
+    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - ctx.psEuroDejaPayesSurPart));
+    var psUcPart = Math.max(0, roundAv2(pv * ctx.ratioUC * AV_PS));
+    var ps = roundAv2(psEuroPart + psUcPart);
     return {
       ps: ps,
       ir: irCredit,
-      pfo: pfo,
+      pfo: roundAv2(pfoBrut),
       irCredit: irCredit,
       impotNet: impotNet,
-      net: ctx.montant - ps - impotNet,
+      net: roundAv2(ctx.montant - ps - pfoBrut),
       abattementUtilise: abatt,
-      detailAvant: { plusValue: pvAvant, tauxIR: tauxAvant, ir: irAvant, regime: "Primes avant 27/09/2017" },
-      detailApres: { plusValue: pvApres, tauxIR: tauxApres, ir: irApres, regime: "Primes à compter du 27/09/2017" },
+      detailAvant: { plusValue: pvAvant, tauxIR: tauxAvant, ir: pvImpAvant * tauxAvant, regime: "Primes avant 27/09/2017" },
+      detailApres: { plusValue: pvApres, tauxIR: tauxApres, ir: pvImpApres * tauxApres, regime: "Primes à compter du 27/09/2017" },
     };
   }
 
@@ -478,8 +478,8 @@
 
     function applyVersement(ev) {
       var net = versementNetFromBrut(form, ev.brut, ev.vType === "initial" ? "initial" : ev.vType === "periodique" ? "periodique" : "exceptionnel");
-      capEuro += net * pctE;
-      capUC += net * pctU;
+      capEuro = roundAv2(capEuro + net * pctE);
+      capUC = roundAv2(capUC + net * pctU);
       primesNettes += net;
       totalVersementsBruts += ev.brut;
       totalVersementsNets += net;
@@ -512,7 +512,7 @@
           ratioUC: cap > 0 ? capUC / cap : pctU,
           psEuroDejaPayesSurPart: 0,
         });
-        montant = montantBrut + fisEst.ps + fisEst.impotNet;
+        montant = montantBrut + fisEst.ps + fisEst.pfo;
         montant = Math.min(montant, cap);
       }
       var ratio = montant / cap;
@@ -575,11 +575,11 @@
       var monthFrac = monthEnd > monthStart ? (effEnd - effStart) / (monthEnd - monthStart) : 0;
       monthFrac = Math.max(0, Math.min(1, monthFrac));
       if (capitalTotal() > 0 && monthFrac > 0) {
-        var gainEuro = capEuro * tauxEuroM * monthFrac;
-        var gainUC = capUC * tauxUcM * monthFrac;
-        var ps = gainEuro * AV_PS;
-        capEuro += gainEuro - ps;
-        capUC += gainUC;
+        var gainEuro = roundAv2(capEuro * tauxEuroM * monthFrac);
+        var gainUC = roundAv2(capUC * tauxUcM * monthFrac);
+        var ps = roundAv2(gainEuro * AV_PS);
+        capEuro = roundAv2(capEuro + gainEuro - ps);
+        capUC = roundAv2(capUC + gainUC);
         totalProduitsBruts += gainEuro + gainUC;
         totalPsEuroAnnuel += ps;
         psEuroCumulProduits += ps;
@@ -637,7 +637,7 @@
       totalRachatsNets: totalRachatsNets,
       totalPsEuroAnnuel: totalPsEuroAnnuel,
       fiscaliteSortie: {
-        ps: totalPsEuroAnnuel + fisSortie.ps,
+        ps: fisSortie.ps,
         psAnnuelEuro: totalPsEuroAnnuel,
         psSortie: fisSortie.ps,
         pfo: fisSortie.pfo,
@@ -654,7 +654,7 @@
         detailAvant: fisSortie.detailAvant,
         detailApres: fisSortie.detailApres,
       },
-      epargneNette: capitalBrut - fisSortie.ps - fisSortie.impotNet,
+      epargneNette: roundAv2(capitalBrut - fisSortie.ps - fisSortie.pfo),
       tauxNet: getTauxNetAv(form),
       endDate: end,
     };
@@ -1990,8 +1990,8 @@
           '<li>Total des rachats bruts : ' + fmtEuroAv(res.totalRachatsBruts) + '</li>' +
           '<li>Total des produits bruts : ' + fmtEuroAv(res.totalProduitsBruts) + '</li></ul></div>' +
           '<div class="av-kpi-block"><div class="av-kpi-label">Épargne nette lors du rachat total</div><div class="av-kpi-value">' + fmtEuroAv(res.epargneNette) + '</div>' +
-          '<ul class="av-kpi-list"><li>Prélèvements sociaux (total) : ' + fmtEuroAv(fis.ps) + '</li>' +
-          '<li>dont PS annuels fonds euros : ' + fmtEuroAv(fis.psAnnuelEuro) + '</li>' +
+          '<ul class="av-kpi-list"><li>Prélèvements sociaux à la sortie : ' + fmtEuroAv(fis.ps) + '</li>' +
+          '<li>dont PS annuels prélevés sur fonds euros : ' + fmtEuroAv(fis.psAnnuelEuro) + '</li>' +
           '<li>dont PS à la sortie : ' + fmtEuroAv(fis.psSortie) + '</li>' +
           '<li>Prélèvement forfaitaire obligatoire : ' + fmtEuroAv(fis.pfo) + '</li>' +
           '<li>Impôt sur le revenu (crédit) : ' + fmtEuroAv(fis.ir) + '</li></ul></div>' +
