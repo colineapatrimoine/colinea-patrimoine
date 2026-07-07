@@ -324,15 +324,30 @@
     var pvImpAvant = Math.max(0, pvAvant - abattAvant);
     var pvImpApres = Math.max(0, pvApres - abattApres);
     var impotDu = pvImpAvant * tauxAvant + pvImpApres * tauxApres;
-    var irCredit = impotDu - pfoBrut;
-    if (irCredit > 0) irCredit = 0;
-    var impotNet = Math.max(0, impotDu);
-    var psDeja = roundAvEuro(ctx.psEuroDejaPayesSurPart);
-    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - psDeja));
+    var pvImpTotal = pvImpAvant + pvImpApres;
+    var produits = Math.max(0, ctx.totalProduitsBruts || 0);
+    // BIG : PS sortie — part euro nette des PS annuels ajustée (part UC)
+    var psAnnExact = roundAv2(ctx.psEuroDejaPayesSurPart);
+    var psAnnAdj = roundAv2(psAnnExact * (1 - ctx.ratioUC * 0.074));
+    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - psAnnAdj));
     var psUcPart = Math.max(0, roundAv2(pv * ctx.ratioUC * AV_PS));
     var ps = roundAvEuro(psEuroPart + psUcPart);
-    var pfo = roundAvEuro(pfoBrut);
+    // BIG : abattement total → PFO sur base produits (hors quote-part PS) ; abattement partiel → impôt dû
+    var pfo;
+    var irCredit;
+    if (pvImpTotal <= 0 && pv > 0) {
+      var psFactorPfo = AV_PS * (ctx.ratioEuro + ctx.ratioUC * 0.35);
+      var psDeductPfo = roundAvEuro(roundAv2(produits * psFactorPfo));
+      var pfoBase = roundAv2(produits - psDeductPfo);
+      var tauxMoyen = pv > 0 ? pfoBrut / pv : tauxApres;
+      pfo = roundAvEuro(roundAv2(pfoBase * tauxMoyen));
+      irCredit = -pfo;
+    } else {
+      pfo = roundAvEuro(impotDu);
+      irCredit = 0;
+    }
     var ir = roundAvEuro(irCredit);
+    var impotNet = Math.max(0, impotDu);
     return {
       ps: ps,
       ir: ir,
@@ -532,6 +547,7 @@
           ratioEuro: cap > 0 ? capEuro / cap : pctE,
           ratioUC: cap > 0 ? capUC / cap : pctU,
           psEuroDejaPayesSurPart: 0,
+          totalProduitsBruts: totalProduitsBruts * plusValueRatio,
         });
         montant = montantBrut + fisEst.ps + fisEst.pfo;
         montant = Math.min(montant, cap);
@@ -553,6 +569,7 @@
         ratioEuro: capEuro / cap,
         ratioUC: capUC / cap,
         psEuroDejaPayesSurPart: psDeja,
+        totalProduitsBruts: totalProduitsBruts * ratio,
       });
       abattementRestant = Math.max(0, abattementRestant - fis.abattementUtilise);
       capEuro = roundAv2(capEuro * (1 - ratio));
@@ -641,7 +658,8 @@
       abattementRestant: abattementRestant,
       ratioEuro: capitalBrut > 0 ? capEuro / capitalTotal() : pctE,
       ratioUC: capitalBrut > 0 ? capUC / capitalTotal() : pctU,
-      psEuroDejaPayesSurPart: roundAvEuro(totalPsEuroAnnuel),
+      psEuroDejaPayesSurPart: roundAv2(totalPsEuroAnnuel),
+      totalProduitsBruts: totalProduitsBruts,
     });
 
     var ratioAvant = encoursTotal > 0 ? primesBrutAvant() / encoursTotal : 0;
