@@ -340,19 +340,22 @@
       events.push({ date: new Date(start.getTime()), kind: "versement", brut: brutInit, vType: "initial", after2017: isPrimeApres2017(start) });
     }
     (form.versements || []).forEach(function (v) {
-      var d = parseDateAv(v.dateDebut);
-      if (!d) return;
       var brut = versementBrutFromSaisie(form, v.montant, v.type === "periodique" ? "periodique" : "exceptionnel");
       if (brut <= 0) return;
       if (v.type === "exceptionnel") {
-        if (d >= start && d <= end) {
-          events.push({ date: d, kind: "versement", brut: brut, vType: "exceptionnel", after2017: isPrimeApres2017(d) });
+        var dEx = parseDateAv(v.dateDebut || v.date);
+        if (dEx && dEx >= start && dEx <= end) {
+          events.push({ date: dEx, kind: "versement", brut: brut, vType: "exceptionnel", after2017: isPrimeApres2017(dEx) });
         }
-      } else {
-        var step = v.periodicite === "annuel" ? 12 : v.periodicite === "semestriel" ? 6 : v.periodicite === "trimestriel" ? 3 : 1;
-        var cur = new Date(d.getTime());
+      } else if (v.type === "periodique") {
+        var d0 = parseDateAv(v.dateDebut);
+        if (!d0) return;
+        var dFin = parseDateAv(v.dateFin) || end;
+        var limit = dFin < end ? dFin : end;
+        var step = v.periodicite === "annuel" ? 12 : 1;
+        var cur = new Date(d0.getTime());
         var idx = 0;
-        while (cur <= end && idx < 600) {
+        while (cur <= limit && idx < 600) {
           if (cur >= start) {
             var montant = brut * Math.pow(1 + Number(form.indexation) / 100, idx);
             events.push({ date: new Date(cur.getTime()), kind: "versement", brut: montant, vType: "periodique", after2017: isPrimeApres2017(cur) });
@@ -363,9 +366,27 @@
       }
     });
     (form.rachats || []).forEach(function (r) {
-      var d = parseDateAv(r.date);
-      if (!d || d < start || d > end) return;
-      events.push({ date: d, kind: "rachat", type: r.type || "partiel", montant: Number(r.montant) || 0 });
+      var rType = r.type || "partiel";
+      if (rType === "periodique") {
+        var rd0 = parseDateAv(r.dateDebut);
+        if (!rd0) return;
+        var rdFin = parseDateAv(r.dateFin) || end;
+        var rLimit = rdFin < end ? rdFin : end;
+        var rStep = r.periodicite === "annuel" ? 12 : 1;
+        var rCur = new Date(rd0.getTime());
+        var rIdx = 0;
+        while (rCur <= rLimit && rIdx < 600) {
+          if (rCur >= start && rCur <= end) {
+            events.push({ date: new Date(rCur.getTime()), kind: "rachat", type: "partiel", montant: Number(r.montant) || 0 });
+          }
+          rCur = addMonthsAv(rCur, rStep);
+          rIdx += 1;
+        }
+      } else {
+        var d = parseDateAv(r.date || r.dateDebut);
+        if (!d || d < start || d > end) return;
+        events.push({ date: d, kind: "rachat", type: rType, montant: Number(r.montant) || 0 });
+      }
     });
     events.sort(function (a, b) { return a.date - b.date; });
     return events;
@@ -380,16 +401,16 @@
       showParametres: false,
       form: {
         dateNaissance: "2002-03-17",
-        situationFiscale: "celibataire",
         encoursAvant2017: 30000,
         encoursApres2017: 0,
         connaitFiscalite: true,
         choixFiscalite: "pfu",
         choixFiscaliteAvant2017: "auto",
         choixFiscaliteApres2017: "pfu",
-        abattementDispo: 4200,
+        abattementDispo: 4600,
         objectif: "capital_terme",
         valeurRecherchee: "capital_terme",
+        typeProduit: "assurance_vie",
         libelleProduit: "Assurance vie",
         modeGestion: "libre",
         dateInvestissement: "2026-07-01",
@@ -442,8 +463,8 @@
     var rowsByYear = {};
     var rachatRows = [];
     var schedule = buildAvSchedule(form, start, end);
-    var abattementRestant = form.connaitFiscalite ? Number(form.abattementDispo) : getAbattementMaxAv(form);
-    if (isNaN(abattementRestant)) abattementRestant = getAbattementMaxAv(form);
+    var abattementRestant = form.connaitFiscalite ? Number(form.abattementDispo) : 4600;
+    if (isNaN(abattementRestant)) abattementRestant = 4600;
 
     var choixApres = form.connaitFiscalite ? (form.choixFiscaliteApres2017 || form.choixFiscalite || "pfu") : "pfu";
     var choixAvant = form.connaitFiscalite ? (form.choixFiscaliteAvant2017 === "auto" ? "pfu" : form.choixFiscaliteAvant2017) : "pfu";
@@ -625,7 +646,7 @@
         gainAvant: plusValueFinale * ratioAvant,
         gainApres: plusValueFinale * (1 - ratioAvant),
         gainImposable: Math.max(0, plusValueFinale - abattementRestant),
-        abattement: getAbattementMaxAv(form) - abattementRestant,
+        abattement: (form.connaitFiscalite ? Number(form.abattementDispo) : 4600) - abattementRestant,
         abattementRestant: abattementRestant,
         tauxIRAvant: getTauxIRPartAv(ageContrat, encoursTotal, choixAvant, form.connaitFiscalite, false),
         tauxIRApres: getTauxIRPartAv(ageContrat, encoursTotal, choixApres, form.connaitFiscalite, true),
@@ -1898,48 +1919,56 @@
     Object.keys(defs).forEach(function (k) {
       if (f[k] === undefined) f[k] = defs[k];
     });
+    if ([0, 4600, 9200].indexOf(Number(f.abattementDispo)) < 0) f.abattementDispo = 4600;
     var res = st.results;
     var tauxNet = getTauxNetAv(f);
 
     function renderVersementRows() {
-      var montants = [0, 100, 250, 500, 1000, 2000, 5000, 10000, 20000];
       return (f.versements || []).map(function (v, i) {
-        var mOpts = montants.indexOf(Number(v.montant)) >= 0 ? montants : montants.concat([Number(v.montant) || 0]).sort(function (a, b) { return a - b; });
-        return '<div class="av-dynamic-row" data-vidx="' + i + '">' +
-          '<select class="form-control av-v-type" data-vidx="' + i + '">' +
-          '<option value="exceptionnel"' + (v.type === "exceptionnel" ? " selected" : "") + '>Versement exceptionnel</option>' +
-          '<option value="periodique"' + (v.type === "periodique" ? " selected" : "") + '>Versement périodique</option>' +
-          '</select>' +
-          '<select class="form-control av-v-montant" data-vidx="' + i + '">' +
-          avSelectOptions(mOpts, v.montant || 0, function (mv) { return fmtEuroAv(mv); }) +
-          '</select>' +
-          (v.type === "periodique" ? '<select class="form-control av-v-periodicite" data-vidx="' + i + '">' +
+        var isPer = v.type === "periodique";
+        return '<div class="av-flow-block" data-vidx="' + i + '">' +
+          '<div class="av-flow-head"><select class="form-control av-v-type" data-vidx="' + i + '">' +
+          '<option value="periodique"' + (isPer ? " selected" : "") + '>Versement périodique</option>' +
+          '<option value="exceptionnel"' + (!isPer ? " selected" : "") + '>Versement exceptionnel</option>' +
+          '</select><button type="button" class="btn btn-outline av-v-del" data-vidx="' + i + '" aria-label="Supprimer">✕</button></div>' +
+          '<div class="av-flow-grid">' +
+          '<div class="form-group"><label>Montant (' + (f.natureVersements === "nets" ? "net" : "brut") + ')</label><input class="form-control av-v-montant" type="number" min="0" step="1" data-vidx="' + i + '" value="' + (v.montant || "") + '" placeholder="0" /></div>' +
+          (isPer ?
+            '<div class="form-group"><label>Périodicité</label><select class="form-control av-v-periodicite" data-vidx="' + i + '">' +
             '<option value="mensuel"' + ((v.periodicite || "mensuel") === "mensuel" ? " selected" : "") + '>Mensuel</option>' +
-            '<option value="trimestriel"' + (v.periodicite === "trimestriel" ? " selected" : "") + '>Trimestriel</option>' +
-            '<option value="semestriel"' + (v.periodicite === "semestriel" ? " selected" : "") + '>Semestriel</option>' +
             '<option value="annuel"' + (v.periodicite === "annuel" ? " selected" : "") + '>Annuel</option>' +
-          '</select>' : '<span></span>') +
-          '<input class="form-control av-v-date" type="date" data-vidx="' + i + '" value="' + escapeHtml(v.dateDebut || f.dateInvestissement) + '" />' +
-          '<button type="button" class="btn btn-outline av-v-del" data-vidx="' + i + '" aria-label="Supprimer">✕</button>' +
-        '</div>';
+            '</select></div>' +
+            '<div class="form-group"><label>Date de début</label><input class="form-control av-v-date-debut" type="date" data-vidx="' + i + '" value="' + escapeHtml(v.dateDebut || f.dateInvestissement) + '" /></div>' +
+            '<div class="form-group"><label>Date de fin</label><input class="form-control av-v-date-fin" type="date" data-vidx="' + i + '" value="' + escapeHtml(v.dateFin || "") + '" /></div>'
+            :
+            '<div class="form-group"><label>Date du versement</label><input class="form-control av-v-date-debut" type="date" data-vidx="' + i + '" value="' + escapeHtml(v.dateDebut || v.date || f.dateInvestissement) + '" /></div>') +
+          '</div></div>';
       }).join("");
     }
 
     function renderRachatRows() {
-      var montants = [0, 500, 1000, 2000, 5000, 10000, 20000, 50000];
       return (f.rachats || []).map(function (r, i) {
-        var mOpts = montants.indexOf(Number(r.montant)) >= 0 ? montants : montants.concat([Number(r.montant) || 0]).sort(function (a, b) { return a - b; });
-        return '<div class="av-dynamic-row" data-ridx="' + i + '">' +
-          '<select class="form-control av-r-type" data-ridx="' + i + '">' +
-          '<option value="partiel"' + ((r.type || "partiel") === "partiel" ? " selected" : "") + '>Rachat partiel</option>' +
-          '<option value="total"' + (r.type === "total" ? " selected" : "") + '>Rachat total</option>' +
-          '</select>' +
-          '<select class="form-control av-r-montant" data-ridx="' + i + '" ' + (r.type === "total" ? "disabled" : "") + '>' +
-          avSelectOptions(mOpts, r.montant || 0, function (mv) { return fmtEuroAv(mv); }) +
-          '</select>' +
-          '<input class="form-control av-r-date" type="date" data-ridx="' + i + '" value="' + escapeHtml(r.date || f.dateInvestissement) + '" />' +
-          '<button type="button" class="btn btn-outline av-r-del" data-ridx="' + i + '" aria-label="Supprimer">✕</button>' +
-        '</div>';
+        var rType = r.type || "partiel";
+        var isPer = rType === "periodique";
+        var isTotal = rType === "total";
+        return '<div class="av-flow-block" data-ridx="' + i + '">' +
+          '<div class="av-flow-head"><select class="form-control av-r-type" data-ridx="' + i + '">' +
+          '<option value="partiel"' + (rType === "partiel" ? " selected" : "") + '>Rachat partiel</option>' +
+          '<option value="periodique"' + (isPer ? " selected" : "") + '>Rachat périodique</option>' +
+          '<option value="total"' + (isTotal ? " selected" : "") + '>Rachat total</option>' +
+          '</select><button type="button" class="btn btn-outline av-r-del" data-ridx="' + i + '" aria-label="Supprimer">✕</button></div>' +
+          '<div class="av-flow-grid">' +
+          (!isTotal ? '<div class="form-group"><label>Montant (' + (f.natureRachats === "nets" ? "net" : "brut") + ')</label><input class="form-control av-r-montant" type="number" min="0" step="1" data-ridx="' + i + '" value="' + (r.montant || "") + '" placeholder="0" /></div>' : "") +
+          (isPer ?
+            '<div class="form-group"><label>Périodicité</label><select class="form-control av-r-periodicite" data-ridx="' + i + '">' +
+            '<option value="mensuel"' + ((r.periodicite || "mensuel") === "mensuel" ? " selected" : "") + '>Mensuel</option>' +
+            '<option value="annuel"' + (r.periodicite === "annuel" ? " selected" : "") + '>Annuel</option>' +
+            '</select></div>' +
+            '<div class="form-group"><label>Date de début</label><input class="form-control av-r-date-debut" type="date" data-ridx="' + i + '" value="' + escapeHtml(r.dateDebut || f.dateInvestissement) + '" /></div>' +
+            '<div class="form-group"><label>Date de fin</label><input class="form-control av-r-date-fin" type="date" data-ridx="' + i + '" value="' + escapeHtml(r.dateFin || "") + '" /></div>'
+            :
+            '<div class="form-group"><label>Date du rachat</label><input class="form-control av-r-date" type="date" data-ridx="' + i + '" value="' + escapeHtml(r.date || r.dateDebut || f.dateInvestissement) + '" /></div>') +
+          '</div></div>';
       }).join("");
     }
 
@@ -2016,17 +2045,9 @@
         '<div class="av-section"><h3 class="about-subtitle">Situation</h3>' +
           '<div class="app-form av-grid">' +
             '<div class="form-group"><label for="av-naissance">Date de naissance <span class="req">*</span></label><input id="av-naissance" class="form-control" type="date" name="dateNaissance" value="' + escapeHtml(f.dateNaissance) + '" required /></div>' +
-            '<div class="form-group"><label for="av-situation">Situation fiscale du foyer</label><select id="av-situation" class="form-control" name="situationFiscale">' +
-              '<option value="celibataire"' + (f.situationFiscale === "celibataire" ? " selected" : "") + '>Célibataire / Divorcé (abattement 4 600 €)</option>' +
-              '<option value="couple"' + (f.situationFiscale === "couple" ? " selected" : "") + '>Couple marié / Pacsé (abattement 9 200 €)</option>' +
-            '</select></div>' +
             '<div class="form-group span-2"><label>Encours des contrats d\'assurance vie et de capitalisation détenus</label></div>' +
-            '<div class="form-group"><label for="av-avant">Lié aux primes versées avant le 27/09/2017</label><select id="av-avant" class="form-control" name="encoursAvant2017">' +
-              avSelectOptions([0, 5000, 10000, 15000, 20000, 30000, 50000, 75000, 100000, 150000, 200000, 300000], f.encoursAvant2017, function (v) { return fmtEuroAv(v); }) +
-            '</select></div>' +
-            '<div class="form-group"><label for="av-apres">Lié aux primes versées à compter du 27/09/2017</label><select id="av-apres" class="form-control" name="encoursApres2017">' +
-              avSelectOptions([0, 5000, 10000, 15000, 20000, 30000, 50000, 75000, 100000, 150000, 200000, 300000], f.encoursApres2017, function (v) { return fmtEuroAv(v); }) +
-            '</select></div>' +
+            '<div class="form-group"><label for="av-avant">Lié aux primes versées avant le 27/09/2017</label><input id="av-avant" class="form-control" type="number" min="0" step="1" name="encoursAvant2017" value="' + (f.encoursAvant2017 || 0) + '" placeholder="0" /> €</div>' +
+            '<div class="form-group"><label for="av-apres">Lié aux primes versées à compter du 27/09/2017</label><input id="av-apres" class="form-control" type="number" min="0" step="1" name="encoursApres2017" value="' + (f.encoursApres2017 || 0) + '" placeholder="0" /> €</div>' +
             '<div class="form-group span-2 av-toggle-row"><label class="av-switch"><input type="checkbox" name="connaitFiscalite"' + (f.connaitFiscalite ? " checked" : "") + ' /><span>Vous connaissez votre fiscalité</span></label></div>' +
             (f.connaitFiscalite ? '<div class="form-group"><label for="av-fisc-avant">Fiscalité — Primes avant 27/09/2017</label><select id="av-fisc-avant" class="form-control" name="choixFiscaliteAvant2017">' +
               '<option value="auto"' + ((f.choixFiscaliteAvant2017 || "auto") === "auto" ? " selected" : "") + '>Barème automatique (35 % / 15 % / 7,5 %)</option>' +
@@ -2036,23 +2057,24 @@
               avFiscaliteOptions(f.choixFiscaliteApres2017 || f.choixFiscalite || "pfu") +
             '</select></div>' +
             '<div class="form-group"><label for="av-abatt">Abattement maximum disponible</label><select id="av-abatt" class="form-control" name="abattementDispo">' +
-              avSelectOptions(
-                [0, 1000, 2000, 3000, 4200, 4600, 5000, 7500, 9200, getAbattementMaxAv(f)],
-                f.abattementDispo,
-                function (v) { return fmtEuroAv(v); }
-              ) +
+              avSelectOptions([0, 4600, 9200], f.abattementDispo, function (v) { return fmtEuroAv(v); }) +
             '</select></div>' : '') +
           '</div></div>' +
 
         '<div class="av-section"><h3 class="about-subtitle">Définition du projet</h3><div class="app-form av-grid">' +
           '<div class="form-group"><label for="av-objectif">Objectif</label><select id="av-objectif" class="form-control" name="objectif">' +
             '<option value="capital_terme"' + (f.objectif === "capital_terme" ? " selected" : "") + '>Disposer d\'un capital au terme</option>' +
-            '<option value="revenus"' + (f.objectif === "revenus" ? " selected" : "") + '>Disposer de revenus complémentaires</option>' +
-            '<option value="effort"' + (f.objectif === "effort" ? " selected" : "") + '>Déterminer un effort d\'épargne</option>' +
+            '<option value="complement_retraite"' + (f.objectif === "complement_retraite" ? " selected" : "") + '>Disposer d\'un complément de retraite</option>' +
+            '<option value="rachat_periodique"' + (f.objectif === "rachat_periodique" ? " selected" : "") + '>Disposer de rachat périodique</option>' +
           '</select></div>' +
           '<div class="form-group"><label for="av-valeur">Valeur recherchée</label><select id="av-valeur" class="form-control" name="valeurRecherchee">' +
             '<option value="capital_terme"' + (f.valeurRecherchee === "capital_terme" ? " selected" : "") + '>Capital au terme</option>' +
-            '<option value="rente"' + (f.valeurRecherchee === "rente" ? " selected" : "") + '>Rente viagère</option>' +
+            '<option value="versement_initial"' + (f.valeurRecherchee === "versement_initial" ? " selected" : "") + '>Versement initial</option>' +
+            '<option value="versement_periodique"' + (f.valeurRecherchee === "versement_periodique" ? " selected" : "") + '>Versement périodique</option>' +
+          '</select></div>' +
+          '<div class="form-group"><label for="av-type-produit">Type de produit</label><select id="av-type-produit" class="form-control" name="typeProduit">' +
+            '<option value="assurance_vie"' + ((f.typeProduit || "assurance_vie") === "assurance_vie" ? " selected" : "") + '>Assurance vie</option>' +
+            '<option value="capitalisation"' + (f.typeProduit === "capitalisation" ? " selected" : "") + '>Capitalisation</option>' +
           '</select></div>' +
           '<div class="form-group"><label for="av-libelle">Libellé du produit</label><input id="av-libelle" class="form-control" type="text" name="libelleProduit" value="' + escapeHtml(f.libelleProduit) + '" /></div>' +
           '<div class="form-group"><label for="av-date">Investissement en <span class="req">*</span></label><input id="av-date" class="form-control" type="date" name="dateInvestissement" value="' + escapeHtml(f.dateInvestissement) + '" required /></div>' +
@@ -2062,9 +2084,8 @@
           '</div></div></div></div>' +
 
         '<div class="av-section"><h3 class="about-subtitle">Versements</h3>' +
-          '<div class="form-group"><label for="av-vi">Versement initial</label><select id="av-vi" class="form-control" name="versementInitial">' +
-            avSelectOptions([0, 500, 1000, 2000, 3000, 5000, 10000, 20000, 50000, 100000], f.versementInitial, function (v) { return fmtEuroAv(v) + " (" + (f.natureVersements === "nets" ? "net" : "brut") + ")"; }) +
-          '</select> <span class="av-hint">à la date du ' + dateInvLabel + '</span></div>' +
+          '<div class="form-group"><label for="av-vi">Versement initial ' + (f.natureVersements === "nets" ? "net" : "brut") + '</label><input id="av-vi" class="form-control" type="number" min="0" step="1" name="versementInitial" value="' + (f.versementInitial || 0) + '" placeholder="0" /> € <span class="av-hint">à la date du ' + dateInvLabel + '</span></div>' +
+          '<p class="av-hint" style="margin-bottom:0.75rem;">Versements suivants</p>' +
           '<div id="av-versements-list">' + renderVersementRows() + '</div>' +
           '<button type="button" class="btn btn-outline" id="av-add-versement">Ajouter un versement</button></div>' +
 
@@ -2085,14 +2106,8 @@
             avSelectOptions(AV_PCT_OPTIONS, f.pctEuros, function (v) { return v + " %"; }) +
           '</select></div>' +
           '<div class="form-group av-donut-wrap"><div class="av-donut" id="av-donut" style="--av-pct:' + f.pctEuros + '%"><span>Fonds euros ' + f.pctEuros + ' %</span><span>UC ' + f.pctUC + ' %</span></div></div>' +
-          '<div class="form-group"><label for="av-taux-net">Taux de rendement net de début de contrat</label><input id="av-taux-net" class="form-control" type="text" readonly value="' + tauxNet.toFixed(2).replace(".", ",") + ' %" /></div>' +
+          '<div class="form-group"><label for="av-taux-net">Taux de rendement net de début de contrat</label><input id="av-taux-net" class="form-control" type="text" readonly value="' + tauxNet.toFixed(2).replace(".", ",") + ' %" /><p class="av-hint">Calculé à partir des taux fonds euros (' + Number(f.tauxEuro).toString().replace(".", ",") + ' %) et UC (' + Number(f.tauxUC).toString().replace(".", ",") + ' %) — voir Paramètres</p></div>' +
           '<div class="form-group span-2"><label for="av-composition">Composition de l\'allocation</label><input id="av-composition" type="range" min="0" max="100" name="composition" value="' + f.composition + '" class="av-range" /><div class="av-range-labels"><span>Prudent</span><span id="av-comp-label">' + f.pctUC + ' % UC</span><span>Offensif</span></div></div>' +
-          '<div class="form-group"><label for="av-te">Taux de rendement net des fonds euros</label><select id="av-te" class="form-control" name="tauxEuro">' +
-            avSelectOptions(AV_TAUX_EURO_OPTS, f.tauxEuro, function (v) { return v.toString().replace(".", ",") + " %"; }) +
-          '</select></div>' +
-          '<div class="form-group"><label for="av-tuc">Taux de rendement net des unités de compte</label><select id="av-tuc" class="form-control" name="tauxUC">' +
-            avSelectOptions(AV_TAUX_UC_OPTS, f.tauxUC, function (v) { return v.toString().replace(".", ",") + " %"; }) +
-          '</select></div>' +
           '<div class="form-group span-2"><button type="button" class="btn btn-outline" id="av-parametres">⚙ Paramètres</button></div>' +
         '</div></div></form></div>';
     } else {
@@ -2116,10 +2131,13 @@
       html += '<div class="av-modal-backdrop" id="av-modal-backdrop"><div class="av-modal" role="dialog" aria-labelledby="av-modal-title">' +
         '<div class="av-modal-head"><h3 id="av-modal-title">Paramètres</h3><button type="button" class="av-modal-close" id="av-modal-close">×</button></div>' +
         '<div class="app-form av-grid">' +
-          '<div class="form-group"><label>Frais sur versement initial <span class="req">*</span></label><input class="form-control" type="number" step="0.1" name="fraisInitial" value="' + f.fraisInitial + '" /> %</div>' +
-          '<div class="form-group"><label>Frais sur versements périodiques <span class="req">*</span></label><input class="form-control" type="number" step="0.1" name="fraisPeriodique" value="' + f.fraisPeriodique + '" /> %</div>' +
-          '<div class="form-group"><label>Frais sur versements exceptionnels <span class="req">*</span></label><input class="form-control" type="number" step="0.1" name="fraisExceptionnel" value="' + f.fraisExceptionnel + '" /> %</div>' +
-          '<div class="form-group span-2"><label>Indexation annuelle des versements périodiques — Au taux de</label><input class="form-control" type="number" step="0.1" name="indexation" value="' + f.indexation + '" /> %</div>' +
+          '<div class="form-group"><label>Frais sur versement initial <span class="req">*</span></label><input class="form-control" type="number" step="0.01" name="fraisInitial" value="' + f.fraisInitial + '" /> %</div>' +
+          '<div class="form-group"><label>Frais sur versements périodiques <span class="req">*</span></label><input class="form-control" type="number" step="0.01" name="fraisPeriodique" value="' + f.fraisPeriodique + '" /> %</div>' +
+          '<div class="form-group"><label>Frais sur versements exceptionnels <span class="req">*</span></label><input class="form-control" type="number" step="0.01" name="fraisExceptionnel" value="' + f.fraisExceptionnel + '" /> %</div>' +
+          '<div class="form-group span-2"><label>Indexation annuelle des versements périodiques — Au taux de</label><input class="form-control" type="number" step="0.01" name="indexation" value="' + f.indexation + '" /> %</div>' +
+          '<div class="form-group"><label>Taux de rendement net des fonds euros</label><input class="form-control" type="number" step="0.01" name="tauxEuro" value="' + f.tauxEuro + '" /> %</div>' +
+          '<div class="form-group"><label>Taux de rendement net des unités de compte</label><input class="form-control" type="number" step="0.01" name="tauxUC" value="' + f.tauxUC + '" /> %</div>' +
+          '<div class="form-group span-2 av-param-preview"><strong>Taux net de début de contrat :</strong> <span id="av-modal-taux-net">' + getTauxNetAv(f).toFixed(2).replace(".", ",") + ' %</span></div>' +
           '<div class="form-group"><label>Nature des versements</label><label><input type="radio" name="natureVersements" value="bruts"' + (f.natureVersements === "bruts" ? " checked" : "") + ' /> Bruts</label> <label><input type="radio" name="natureVersements" value="nets"' + (f.natureVersements === "nets" ? " checked" : "") + ' /> Nets</label></div>' +
           '<div class="form-group"><label>Nature des rachats</label><label><input type="radio" name="natureRachats" value="bruts"' + (f.natureRachats === "bruts" ? " checked" : "") + ' /> Bruts</label> <label><input type="radio" name="natureRachats" value="nets"' + (f.natureRachats === "nets" ? " checked" : "") + ' /> Nets</label></div>' +
         '</div>' +
@@ -2135,7 +2153,6 @@
       if (!formEl) return;
       var fd = new FormData(formEl);
       f.dateNaissance = fd.get("dateNaissance") || f.dateNaissance;
-      f.situationFiscale = fd.get("situationFiscale") || f.situationFiscale || "celibataire";
       f.encoursAvant2017 = Number(fd.get("encoursAvant2017") || 0);
       f.encoursApres2017 = Number(fd.get("encoursApres2017") || 0);
       f.connaitFiscalite = !!formEl.querySelector("[name=connaitFiscalite]")?.checked;
@@ -2144,9 +2161,10 @@
         f.choixFiscaliteApres2017 = fd.get("choixFiscaliteApres2017");
         f.choixFiscalite = f.choixFiscaliteApres2017;
       }
-      f.abattementDispo = Number(fd.get("abattementDispo") || getAbattementMaxAv(f));
+      f.abattementDispo = Number(fd.get("abattementDispo") || 0);
       f.objectif = fd.get("objectif") || f.objectif;
       f.valeurRecherchee = fd.get("valeurRecherchee") || f.valeurRecherchee;
+      f.typeProduit = fd.get("typeProduit") || f.typeProduit || "assurance_vie";
       f.libelleProduit = fd.get("libelleProduit") || f.libelleProduit;
       f.modeGestion = fd.get("modeGestion") || f.modeGestion;
       f.dateInvestissement = fd.get("dateInvestissement") || f.dateInvestissement;
@@ -2156,8 +2174,6 @@
       f.pctUC = Number(fd.get("pctUC") || 0);
       f.pctEuros = 100 - f.pctUC;
       f.euroCroissance = !!formEl.querySelector("[name=euroCroissance]")?.checked;
-      f.tauxEuro = Number(fd.get("tauxEuro") || 0);
-      f.tauxUC = Number(fd.get("tauxUC") || 0);
       f.composition = Number(fd.get("composition") || 0);
       normalizeAllocationAv(f);
       document.querySelectorAll(".av-v-type").forEach(function (el) {
@@ -2172,9 +2188,13 @@
         var i = +el.getAttribute("data-vidx");
         if (f.versements[i]) f.versements[i].periodicite = el.value;
       });
-      document.querySelectorAll(".av-v-date").forEach(function (el) {
+      document.querySelectorAll(".av-v-date-debut").forEach(function (el) {
         var i = +el.getAttribute("data-vidx");
         if (f.versements[i]) f.versements[i].dateDebut = el.value;
+      });
+      document.querySelectorAll(".av-v-date-fin").forEach(function (el) {
+        var i = +el.getAttribute("data-vidx");
+        if (f.versements[i]) f.versements[i].dateFin = el.value;
       });
       document.querySelectorAll(".av-r-type").forEach(function (el) {
         var i = +el.getAttribute("data-ridx");
@@ -2184,10 +2204,34 @@
         var i = +el.getAttribute("data-ridx");
         if (f.rachats[i]) f.rachats[i].montant = Number(el.value || 0);
       });
+      document.querySelectorAll(".av-r-periodicite").forEach(function (el) {
+        var i = +el.getAttribute("data-ridx");
+        if (f.rachats[i]) f.rachats[i].periodicite = el.value;
+      });
       document.querySelectorAll(".av-r-date").forEach(function (el) {
         var i = +el.getAttribute("data-ridx");
         if (f.rachats[i]) f.rachats[i].date = el.value;
       });
+      document.querySelectorAll(".av-r-date-debut").forEach(function (el) {
+        var i = +el.getAttribute("data-ridx");
+        if (f.rachats[i]) f.rachats[i].dateDebut = el.value;
+      });
+      document.querySelectorAll(".av-r-date-fin").forEach(function (el) {
+        var i = +el.getAttribute("data-ridx");
+        if (f.rachats[i]) f.rachats[i].dateFin = el.value;
+      });
+    }
+
+    function collectParametresFromModal(m) {
+      if (!m) return;
+      f.fraisInitial = Number(m.querySelector("[name=fraisInitial]").value || 1);
+      f.fraisPeriodique = Number(m.querySelector("[name=fraisPeriodique]").value || 1);
+      f.fraisExceptionnel = Number(m.querySelector("[name=fraisExceptionnel]").value || 1);
+      f.indexation = Number(m.querySelector("[name=indexation]").value || 0);
+      f.tauxEuro = Number(m.querySelector("[name=tauxEuro]").value || 0);
+      f.tauxUC = Number(m.querySelector("[name=tauxUC]").value || 0);
+      f.natureVersements = m.querySelector("[name=natureVersements]:checked")?.value || "bruts";
+      f.natureRachats = m.querySelector("[name=natureRachats]:checked")?.value || "bruts";
     }
 
     function syncAllocationUI() {
@@ -2198,15 +2242,22 @@
       var donut = document.getElementById("av-donut");
       var comp = document.getElementById("av-composition");
       var compLabel = document.getElementById("av-comp-label");
+      var net = getTauxNetAv(f);
       if (ucSel) ucSel.value = String(f.pctUC);
       if (euroSel) euroSel.value = String(f.pctEuros);
-      if (tauxNetEl) tauxNetEl.value = getTauxNetAv(f).toFixed(2).replace(".", ",") + " %";
+      if (tauxNetEl) {
+        tauxNetEl.value = net.toFixed(2).replace(".", ",") + " %";
+        var hint = tauxNetEl.parentElement && tauxNetEl.parentElement.querySelector(".av-hint");
+        if (hint) hint.textContent = "Calculé à partir des taux fonds euros (" + Number(f.tauxEuro).toString().replace(".", ",") + " %) et UC (" + Number(f.tauxUC).toString().replace(".", ",") + " %) — voir Paramètres";
+      }
       if (donut) {
         donut.style.setProperty("--av-pct", f.pctEuros + "%");
         donut.innerHTML = "<span>Fonds euros " + f.pctEuros + " %</span><span>UC " + f.pctUC + " %</span>";
       }
       if (comp) comp.value = String(f.composition);
       if (compLabel) compLabel.textContent = f.pctUC + " % UC";
+      var modalNet = document.getElementById("av-modal-taux-net");
+      if (modalNet) modalNet.textContent = net.toFixed(2).replace(".", ",") + " %";
     }
 
     function updateResultsUI() {
@@ -2256,7 +2307,7 @@
     var addV = document.getElementById("av-add-versement");
     if (addV) addV.addEventListener("click", function () {
       collectForm();
-      f.versements.push({ type: "exceptionnel", montant: 0, dateDebut: f.dateInvestissement });
+      f.versements.push({ type: "periodique", montant: 0, periodicite: "mensuel", dateDebut: f.dateInvestissement, dateFin: "" });
       route();
     });
     var addR = document.getElementById("av-add-rachat");
@@ -2308,13 +2359,17 @@
           route();
           return;
         }
-        if (e.target.name === "situationFiscale") {
+        if (e.target.name === "typeProduit") {
           collectForm();
-          if (f.abattementDispo > getAbattementMaxAv(f)) f.abattementDispo = getAbattementMaxAv(f);
+          if (f.typeProduit === "capitalisation") f.libelleProduit = "Capitalisation";
+          else f.libelleProduit = "Assurance vie";
           route();
           return;
         }
         triggerAvRecalc();
+      });
+      formEl.addEventListener("input", function (e) {
+        if (e.target.matches(".av-v-montant, .av-r-montant, #av-vi, #av-avant, #av-apres")) triggerAvRecalc();
       });
     }
 
@@ -2341,18 +2396,27 @@
     if (modalClose) modalClose.addEventListener("click", closeModal);
     if (modalCancel) modalCancel.addEventListener("click", closeModal);
     if (modalSave) modalSave.addEventListener("click", function () {
-      var m = modalBackdrop;
-      if (m) {
-        f.fraisInitial = Number(m.querySelector("[name=fraisInitial]").value || 1);
-        f.fraisPeriodique = Number(m.querySelector("[name=fraisPeriodique]").value || 1);
-        f.fraisExceptionnel = Number(m.querySelector("[name=fraisExceptionnel]").value || 1);
-        f.indexation = Number(m.querySelector("[name=indexation]").value || 0);
-        f.natureVersements = m.querySelector("[name=natureVersements]:checked")?.value || "bruts";
-        f.natureRachats = m.querySelector("[name=natureRachats]:checked")?.value || "bruts";
-      }
+      collectForm();
+      collectParametresFromModal(modalBackdrop);
       st.showParametres = false;
+      st.calculated = true;
       route();
     });
+    if (modalBackdrop) {
+      modalBackdrop.addEventListener("input", function (e) {
+        if (!e.target.closest(".av-modal")) return;
+        var te = modalBackdrop.querySelector("[name=tauxEuro]");
+        var tu = modalBackdrop.querySelector("[name=tauxUC]");
+        var pe = modalBackdrop.querySelector("[name=fraisInitial]");
+        if (te && tu) {
+          var preview = modalBackdrop.querySelector("#av-modal-taux-net");
+          var pctE = f.pctEuros / 100;
+          var pctU = f.pctUC / 100;
+          var net = pctE * Number(te.value || 0) + pctU * Number(tu.value || 0);
+          if (preview) preview.textContent = net.toFixed(2).replace(".", ",") + " %";
+        }
+      });
+    }
 
     var calcBtn = document.getElementById("av-calc");
     if (calcBtn) calcBtn.addEventListener("click", function () {
@@ -2368,6 +2432,8 @@
     var prevBtn = document.getElementById("av-prev");
     if (prevBtn) prevBtn.addEventListener("click", function () { st.tab = "projet"; route(); });
     document.querySelectorAll("#av-print").forEach(function (btn) { btn.addEventListener("click", function () { window.print(); }); });
+
+    if (st.calculated) triggerAvRecalc();
   }
 
   function viewSimulator(params) {
