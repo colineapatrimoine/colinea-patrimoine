@@ -327,15 +327,17 @@
     var irCredit = impotDu - pfoBrut;
     if (irCredit > 0) irCredit = 0;
     var impotNet = Math.max(0, impotDu);
-    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - ctx.psEuroDejaPayesSurPart));
+    var psDeja = roundAvEuro(ctx.psEuroDejaPayesSurPart);
+    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - psDeja));
     var psUcPart = Math.max(0, roundAv2(pv * ctx.ratioUC * AV_PS));
     var ps = roundAvEuro(psEuroPart + psUcPart);
     var pfo = roundAvEuro(pfoBrut);
+    var ir = roundAvEuro(irCredit);
     return {
       ps: ps,
-      ir: irCredit,
+      ir: ir,
       pfo: pfo,
-      irCredit: irCredit,
+      irCredit: ir,
       impotNet: impotNet,
       net: roundAvEuro(ctx.montant - ps - pfo),
       abattementUtilise: abatt,
@@ -608,7 +610,7 @@
         yr.produits += gainEuro + gainUC;
         yr.psEuro += ps;
       }
-      ensureYear(cur.getFullYear()).capital = capitalTotal();
+      ensureYear(cur.getFullYear()).capital = roundAvEuro(capitalTotal());
       cur = addMonthsAv(cur, 1);
     }
 
@@ -621,11 +623,10 @@
     });
 
     var rows = Object.keys(rowsByYear).sort().map(function (k) { return rowsByYear[k]; });
-    var capitalBrut = capitalTotal();
+    var capitalBrut = roundAvEuro(capitalTotal());
     var ageContrat = diffYearsAv(start, end);
     var encoursTotal = encoursTotalPrimes();
-    var gainsTotaux = Math.max(0, totalProduitsBruts);
-    var plusValueFinale = Math.max(0, capitalBrut - primesNettes);
+    var plusValueFinale = Math.max(0, capitalBrut - roundAvEuro(primesNettes));
 
     var fisSortie = computeFiscaliteRachatAv({
       montant: capitalBrut,
@@ -638,12 +639,12 @@
       choixApres: choixApres,
       connaitFiscalite: form.connaitFiscalite,
       abattementRestant: abattementRestant,
-      ratioEuro: capitalBrut > 0 ? capEuro / capitalBrut : pctE,
-      ratioUC: capitalBrut > 0 ? capUC / capitalBrut : pctU,
-      psEuroDejaPayesSurPart: psEuroCumulProduits,
+      ratioEuro: capitalBrut > 0 ? capEuro / capitalTotal() : pctE,
+      ratioUC: capitalBrut > 0 ? capUC / capitalTotal() : pctU,
+      psEuroDejaPayesSurPart: roundAvEuro(totalPsEuroAnnuel),
     });
 
-    var ratioAvant = encoursTotal > 0 ? primesBrutAvant / encoursTotal : 0;
+    var ratioAvant = encoursTotal > 0 ? primesBrutAvant() / encoursTotal : 0;
 
     return {
       rows: rows,
@@ -659,7 +660,7 @@
       totalPsEuroAnnuel: totalPsEuroAnnuel,
       fiscaliteSortie: {
         ps: fisSortie.ps,
-        psAnnuelEuro: totalPsEuroAnnuel,
+        psAnnuelEuro: roundAvEuro(totalPsEuroAnnuel),
         psSortie: fisSortie.ps,
         pfo: fisSortie.pfo,
         ir: fisSortie.ir,
@@ -675,7 +676,7 @@
         detailAvant: fisSortie.detailAvant,
         detailApres: fisSortie.detailApres,
       },
-      epargneNette: roundAvEuro(capitalBrut - fisSortie.ps - fisSortie.pfo),
+      epargneNette: fisSortie.net,
       tauxNet: getTauxNetAv(form),
       endDate: end,
     };
@@ -2011,11 +2012,10 @@
           '<li>Total des rachats bruts : ' + fmtEuroAv(res.totalRachatsBruts) + '</li>' +
           '<li>Total des produits bruts : ' + fmtEuroAv(res.totalProduitsBruts) + '</li></ul></div>' +
           '<div class="av-kpi-block"><div class="av-kpi-label">Épargne nette lors du rachat total</div><div class="av-kpi-value">' + fmtEuroAv(res.epargneNette) + '</div>' +
-          '<ul class="av-kpi-list"><li>Prélèvements sociaux à la sortie : ' + fmtEuroAv(fis.ps) + '</li>' +
-          '<li>dont PS annuels prélevés sur fonds euros : ' + fmtEuroAv(fis.psAnnuelEuro) + '</li>' +
-          '<li>dont PS à la sortie : ' + fmtEuroAv(fis.psSortie) + '</li>' +
+          '<ul class="av-kpi-list"><li>Prélèvements sociaux : ' + fmtEuroAv(fis.ps) + '</li>' +
           '<li>Prélèvement forfaitaire obligatoire : ' + fmtEuroAv(fis.pfo) + '</li>' +
-          '<li>Impôt sur le revenu (crédit) : ' + fmtEuroAv(fis.ir) + '</li></ul></div>' +
+          '<li>Impôt sur le revenu : ' + fmtEuroAv(fis.ir) + '</li>' +
+          '<li>Restitution de prélèvements sociaux : ' + fmtEuroAv(fis.restitutionPs) + '</li></ul></div>' +
           '<div class="av-fiscal-note"><strong>Fiscalité détaillée</strong>' +
           '<p>Âge du contrat simulé : ' + fis.ageContrat.toFixed(1).replace(".", ",") + ' ans</p>' +
           '<p><u>Primes avant 27/09/2017</u> — Taux IR/PFL : ' + (fis.tauxIRAvant * 100).toFixed(1).replace(".", ",") + ' % — Plus-value : ' + fmtEuroAv(fis.gainAvant) + '</p>' +
