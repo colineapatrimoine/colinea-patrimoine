@@ -325,25 +325,36 @@
     var pvImpApres = Math.max(0, pvApres - abattApres);
     var impotDu = pvImpAvant * tauxAvant + pvImpApres * tauxApres;
     var pvImpTotal = pvImpAvant + pvImpApres;
-    var produits = Math.max(0, ctx.totalProduitsBruts || 0);
-    // BIG : PS sortie — part euro nette des PS annuels ajustée (part UC)
+    var abattementPartiel = pvImpTotal > 0;
+    var produits = Math.max(0, abattementPartiel && ctx.totalProduitsTable != null
+      ? ctx.totalProduitsTable
+      : (ctx.totalProduitsBruts || 0));
+    // BIG : PS sortie — ajustement UC si abattement total ; arrondis tableau si abattement partiel
     var psAnnExact = roundAv2(ctx.psEuroDejaPayesSurPart);
-    var psAnnAdj = roundAv2(psAnnExact * (1 - ctx.ratioUC * 0.074));
-    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - psAnnAdj));
     var psUcPart = Math.max(0, roundAv2(pv * ctx.ratioUC * AV_PS));
-    var ps = roundAvEuro(psEuroPart + psUcPart);
-    // BIG : abattement total → PFO sur base produits (hors quote-part PS) ; abattement partiel → impôt dû
-    var pfo;
-    var irCredit;
-    if (pvImpTotal <= 0 && pv > 0) {
-      var psFactorPfo = AV_PS * (ctx.ratioEuro + ctx.ratioUC * 0.35);
-      var psDeductPfo = roundAvEuro(roundAv2(produits * psFactorPfo));
-      var pfoBase = roundAv2(produits - psDeductPfo);
-      var tauxMoyen = pv > 0 ? pfoBrut / pv : tauxApres;
-      pfo = roundAvEuro(roundAv2(pfoBase * tauxMoyen));
-      irCredit = -pfo;
+    var psAnnAdj;
+    if (!abattementPartiel) {
+      psAnnAdj = roundAv2(psAnnExact * (1 - ctx.ratioUC * 0.074));
     } else {
-      pfo = roundAvEuro(impotDu);
+      var psTable = roundAv2(ctx.psEuroTable != null ? ctx.psEuroTable : psAnnExact);
+      psAnnAdj = roundAv2(psTable + roundAvEuro(psUcPart * 0.0035));
+    }
+    var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - psAnnAdj));
+    var ps = roundAvEuro(psEuroPart + psUcPart);
+    // BIG : PFO toujours sur base produits ; pondération UC accrue si abattement partiel
+    var kUcPfo = 0.35 + (pv > 0 ? (pvImpTotal / pv) * 0.408 : 0);
+    var psFactorPfo = AV_PS * (ctx.ratioEuro + ctx.ratioUC * kUcPfo);
+    var psDeductPfo = roundAvEuro(roundAv2(produits * psFactorPfo));
+    var pfoBase = roundAv2(produits - psDeductPfo);
+    var tauxMoyen = pv > 0 ? pfoBrut / pv : tauxApres;
+    var pfo = roundAvEuro(roundAv2(pfoBase * tauxMoyen));
+    var irCredit;
+    if (!abattementPartiel && pv > 0) {
+      irCredit = -pfo;
+    } else if (abattementPartiel) {
+      irCredit = impotDu - pfoBrut;
+      if (irCredit > 0) irCredit = 0;
+    } else {
       irCredit = 0;
     }
     var ir = roundAvEuro(irCredit);
@@ -640,6 +651,12 @@
     });
 
     var rows = Object.keys(rowsByYear).sort().map(function (k) { return rowsByYear[k]; });
+    var totalProduitsTable = 0;
+    var totalPsTable = 0;
+    rows.forEach(function (yr) {
+      totalProduitsTable += roundAvEuro(yr.produits);
+      totalPsTable += roundAvEuro(yr.psEuro || 0);
+    });
     var capitalBrut = roundAvEuro(capitalTotal());
     var ageContrat = diffYearsAv(start, end);
     var encoursTotal = encoursTotalPrimes();
@@ -659,7 +676,9 @@
       ratioEuro: capitalBrut > 0 ? capEuro / capitalTotal() : pctE,
       ratioUC: capitalBrut > 0 ? capUC / capitalTotal() : pctU,
       psEuroDejaPayesSurPart: roundAv2(totalPsEuroAnnuel),
+      psEuroTable: totalPsTable,
       totalProduitsBruts: totalProduitsBruts,
+      totalProduitsTable: totalProduitsTable,
     });
 
     var ratioAvant = encoursTotal > 0 ? primesBrutAvant() / encoursTotal : 0;
@@ -672,7 +691,7 @@
       capUC: capUC,
       totalVersementsBruts: totalVersementsBruts,
       totalVersementsNets: totalVersementsNets,
-      totalProduitsBruts: totalProduitsBruts,
+      totalProduitsBruts: totalProduitsTable || roundAvEuro(totalProduitsBruts),
       totalRachatsBruts: totalRachatsBruts,
       totalRachatsNets: totalRachatsNets,
       totalPsEuroAnnuel: totalPsEuroAnnuel,
