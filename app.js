@@ -251,6 +251,16 @@
     return Math.round(Number(n) * 100) / 100;
   }
 
+  function roundAvEuro(n) {
+    return Math.round(Number(n) || 0);
+  }
+
+  function tauxMensuelActuarielAv(tauxAnnuelPct) {
+    var r = Number(tauxAnnuelPct) / 100;
+    if (r <= 0) return 0;
+    return Math.pow(1 + r, 1 / 12) - 1;
+  }
+
   function getAbattementMaxAv(form) {
     return form.situationFiscale === "couple" ? AV_ABATTEMENT_COUPLE : AV_ABATTEMENT_CELIB;
   }
@@ -319,14 +329,15 @@
     var impotNet = Math.max(0, impotDu);
     var psEuroPart = Math.max(0, roundAv2(pv * ctx.ratioEuro * AV_PS - ctx.psEuroDejaPayesSurPart));
     var psUcPart = Math.max(0, roundAv2(pv * ctx.ratioUC * AV_PS));
-    var ps = roundAv2(psEuroPart + psUcPart);
+    var ps = roundAvEuro(psEuroPart + psUcPart);
+    var pfo = roundAvEuro(pfoBrut);
     return {
       ps: ps,
       ir: irCredit,
-      pfo: roundAv2(pfoBrut),
+      pfo: pfo,
       irCredit: irCredit,
       impotNet: impotNet,
-      net: roundAv2(ctx.montant - ps - pfoBrut),
+      net: roundAvEuro(ctx.montant - ps - pfo),
       abattementUtilise: abatt,
       detailAvant: { plusValue: pvAvant, tauxIR: tauxAvant, ir: pvImpAvant * tauxAvant, regime: "Primes avant 27/09/2017" },
       detailApres: { plusValue: pvApres, tauxIR: tauxApres, ir: pvImpApres * tauxApres, regime: "Primes à compter du 27/09/2017" },
@@ -444,14 +455,16 @@
 
     var pctE = form.pctEuros / 100;
     var pctU = form.pctUC / 100;
-    var tauxEuroM = Number(form.tauxEuro) / 100 / 12;
-    var tauxUcM = Number(form.tauxUC) / 100 / 12;
+    var tauxEuroM = tauxMensuelActuarielAv(form.tauxEuro);
+    var tauxUcM = tauxMensuelActuarielAv(form.tauxUC);
 
     var capEuro = 0;
     var capUC = 0;
     var primesNettes = 0;
-    var primesBrutAvant = Number(form.encoursAvant2017) || 0;
-    var primesBrutApres = Number(form.encoursApres2017) || 0;
+    var primesEncoursAvant = Number(form.encoursAvant2017) || 0;
+    var primesEncoursApres = Number(form.encoursApres2017) || 0;
+    var primesContratAvant = 0;
+    var primesContratApres = 0;
     var totalVersementsBruts = 0;
     var totalVersementsNets = 0;
     var totalProduitsBruts = 0;
@@ -471,6 +484,12 @@
 
     function capitalTotal() { return capEuro + capUC; }
 
+    function primesBrutAvant() { return primesEncoursAvant + primesContratAvant; }
+
+    function primesBrutApres() { return primesEncoursApres + primesContratApres; }
+
+    function encoursTotalPrimes() { return primesBrutAvant() + primesBrutApres(); }
+
     function ensureYear(y) {
       if (!rowsByYear[y]) rowsByYear[y] = { year: y, versementsNets: 0, produits: 0, rachatsBruts: 0, psEuro: 0, capital: 0 };
       return rowsByYear[y];
@@ -483,7 +502,7 @@
       primesNettes += net;
       totalVersementsBruts += ev.brut;
       totalVersementsNets += net;
-      if (ev.after2017) primesBrutApres += ev.brut; else primesBrutAvant += ev.brut;
+      if (ev.after2017) primesContratApres += ev.brut; else primesContratAvant += ev.brut;
       var yr = ensureYear(ev.date.getFullYear());
       yr.versementsNets += net;
     }
@@ -500,10 +519,10 @@
         var fisEst = computeFiscaliteRachatAv({
           montant: montantBrut,
           plusValue: pvEst,
-          primesAvant: primesBrutAvant,
-          primesApres: primesBrutApres,
+          primesAvant: primesBrutAvant(),
+          primesApres: primesBrutApres(),
           ageAns: diffYearsAv(start, ev.date),
-          encoursTotal: primesBrutAvant + primesBrutApres + totalVersementsBruts,
+          encoursTotal: encoursTotalPrimes(),
           choixAvant: choixAvant,
           choixApres: choixApres,
           connaitFiscalite: form.connaitFiscalite,
@@ -521,10 +540,10 @@
       var fis = computeFiscaliteRachatAv({
         montant: montant,
         plusValue: plusValue,
-        primesAvant: primesBrutAvant,
-        primesApres: primesBrutApres,
+        primesAvant: primesBrutAvant(),
+        primesApres: primesBrutApres(),
         ageAns: diffYearsAv(start, ev.date),
-        encoursTotal: primesBrutAvant + primesBrutApres + totalVersementsBruts,
+        encoursTotal: encoursTotalPrimes(),
         choixAvant: choixAvant,
         choixApres: choixApres,
         connaitFiscalite: form.connaitFiscalite,
@@ -534,10 +553,12 @@
         psEuroDejaPayesSurPart: psDeja,
       });
       abattementRestant = Math.max(0, abattementRestant - fis.abattementUtilise);
-      capEuro -= capEuro * ratio;
-      capUC -= capUC * ratio;
-      primesNettes -= primesNettes * ratio;
-      psEuroCumulProduits -= psDeja;
+      capEuro = roundAv2(capEuro * (1 - ratio));
+      capUC = roundAv2(capUC * (1 - ratio));
+      primesNettes = roundAv2(primesNettes * (1 - ratio));
+      primesContratAvant = roundAv2(primesContratAvant * (1 - ratio));
+      primesContratApres = roundAv2(primesContratApres * (1 - ratio));
+      psEuroCumulProduits = roundAv2(psEuroCumulProduits * (1 - ratio));
       totalRachatsBruts += montant;
       totalRachatsNets += fis.net;
       var yr = ensureYear(ev.date.getFullYear());
@@ -602,15 +623,15 @@
     var rows = Object.keys(rowsByYear).sort().map(function (k) { return rowsByYear[k]; });
     var capitalBrut = capitalTotal();
     var ageContrat = diffYearsAv(start, end);
-    var encoursTotal = primesBrutAvant + primesBrutApres + totalVersementsBruts;
+    var encoursTotal = encoursTotalPrimes();
     var gainsTotaux = Math.max(0, totalProduitsBruts);
     var plusValueFinale = Math.max(0, capitalBrut - primesNettes);
 
     var fisSortie = computeFiscaliteRachatAv({
       montant: capitalBrut,
       plusValue: plusValueFinale,
-      primesAvant: primesBrutAvant,
-      primesApres: primesBrutApres,
+      primesAvant: primesBrutAvant(),
+      primesApres: primesBrutApres(),
       ageAns: ageContrat,
       encoursTotal: encoursTotal,
       choixAvant: choixAvant,
@@ -654,7 +675,7 @@
         detailAvant: fisSortie.detailAvant,
         detailApres: fisSortie.detailApres,
       },
-      epargneNette: roundAv2(capitalBrut - fisSortie.ps - fisSortie.pfo),
+      epargneNette: roundAvEuro(capitalBrut - fisSortie.ps - fisSortie.pfo),
       tauxNet: getTauxNetAv(form),
       endDate: end,
     };
