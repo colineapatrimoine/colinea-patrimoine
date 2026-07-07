@@ -154,6 +154,521 @@
     { id: "recap", title: "Récapitulatif" },
   ];
 
+  const RISQUE_LABELS = ["Sécuritaire", "Défensif", "Équilibré", "Dynamique", "Offensif"];
+  const RISQUE_DESCRIPTIONS = {
+    "Sécuritaire": "Votre profil est sécuritaire. Vous privilégiez la sécurité du capital et acceptez une performance limitée.",
+    "Défensif": "Votre profil est défensif. Vous acceptez une prise de risque modérée pour obtenir un rendement un peu plus élevé tout en limitant les fluctuations.",
+    "Équilibré": "Votre profil est équilibré. Vous acceptez un niveau de risque modéré en contrepartie d'une espérance de rendement plus élevée.",
+    "Dynamique": "Votre profil est dynamique. Vous êtes prêt à vous positionner en partie sur des marchés volatiles en contrepartie d'une espérance de gain élevée. De ce fait, vous êtes prêt à accepter d'importantes fluctuations de la valeur de votre capital dans le temps.",
+    "Offensif": "Votre profil est offensif. Vous recherchez la performance maximale et acceptez une forte volatilité et un risque de perte important.",
+  };
+
+  const PERTES_LABELS = ["Très faible", "Faible", "Moyenne", "Élevée", "Très élevée"];
+  const PERTES_DESCRIPTIONS = {
+    "Très faible": "D'après votre situation financière et patrimoniale, votre capacité à subir des pertes est très faible.",
+    "Faible": "D'après votre situation financière et patrimoniale, votre capacité à subir des pertes est faible.",
+    "Moyenne": "D'après votre situation financière et patrimoniale, votre capacité à subir des pertes est moyenne.",
+    "Élevée": "D'après votre situation financière et patrimoniale, votre capacité à subir des pertes est élevée.",
+    "Très élevée": "D'après votre situation financière et patrimoniale, votre capacité à subir des pertes est très élevée.",
+  };
+
+  const EXTRA_LABELS = ["Neutre", "Modérée", "Significative", "Forte"];
+  const EXTRA_DESCRIPTIONS = {
+    "Neutre": "Vous n'avez pas exprimé de préférence particulière en matière de critères extra-financiers.",
+    "Modérée": "D'après les réponses apportées au questionnaire, votre sensibilité extra-financière est modérée.",
+    "Significative": "D'après les réponses apportées au questionnaire, votre sensibilité extra-financière est significative.",
+    "Forte": "D'après les réponses apportées au questionnaire, votre sensibilité extra-financière est forte.",
+  };
+
+  function getRisqueResult(r) {
+    if (!r || !r.scenario || !r.placements || !r.placement_abc) return null;
+    var scenarioScore = r.scenario === "accepter" ? 1 : 0;
+    var placementsScore = Math.max(0, parseInt(r.placements, 10) - 1) || 0;
+    var abcScore = r.placement_abc === "A" ? 0 : r.placement_abc === "B" ? 1 : 2;
+    var total = scenarioScore * 2 + placementsScore + abcScore;
+    var index = Math.min(4, Math.max(0, Math.floor((total / 6) * 5)));
+    var label = RISQUE_LABELS[index];
+    return { index: index, label: label, description: RISQUE_DESCRIPTIONS[label] || "" };
+  }
+
+  function getPertesResult(p) {
+    if (!p || p.revenus_foyer === "" || p.epargne_mensuelle === "") return null;
+    var revOrder = ["<25", "25-50", "50-75", "75-100", "100-150", "150-300", ">300"].indexOf(p.revenus_foyer);
+    if (revOrder < 0) revOrder = 0;
+    var epOrder = ["0", "0-500", "500-1000", "1000-2000", ">2000"].indexOf(p.epargne_mensuelle);
+    if (epOrder < 0) epOrder = 0;
+    var score = revOrder * 2 + epOrder;
+    var index = Math.min(4, Math.max(0, Math.floor((score / 18) * 5)));
+    var label = PERTES_LABELS[index];
+    return { index: index, label: label, description: PERTES_DESCRIPTIONS[label] || "" };
+  }
+
+  var AV_PS = 0.172;
+  var AV_PFU_IR = 0.128;
+  var AV_DATE_PIVOT = new Date(2017, 8, 27);
+  var AV_SEUIL_150K = 150000;
+  var AV_ABATTEMENT_CELIB = 4600;
+  var AV_ABATTEMENT_COUPLE = 9200;
+  var AV_PCT_OPTIONS = [];
+  var AV_TAUX_EURO_OPTS = [0.5, 0.8, 1, 1.2, 1.5, 1.89, 2, 2.5, 3, 3.5];
+  var AV_TAUX_UC_OPTS = [0, 1, 2, 3, 3.5, 4, 5, 6, 8, 10];
+  for (var _p = 0; _p <= 100; _p += 5) AV_PCT_OPTIONS.push(_p);
+
+  function fmtEuroAv(n, dec) {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: dec == null ? 0 : dec }).format(n || 0);
+  }
+
+  function parseDateAv(s) {
+    if (!s) return null;
+    var p = String(s).split("-");
+    if (p.length < 3) return null;
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+
+  function addMonthsAv(d, months) {
+    var r = new Date(d.getTime());
+    r.setMonth(r.getMonth() + months);
+    return r;
+  }
+
+  function diffYearsAv(start, end) {
+    if (!start || !end) return 0;
+    return (end - start) / (365.25 * 24 * 3600 * 1000);
+  }
+
+  function isPrimeApres2017(date) {
+    return date && date.getTime() >= AV_DATE_PIVOT.getTime();
+  }
+
+  function normalizeAllocationAv(form) {
+    var uc = Math.round(Math.min(100, Math.max(0, Number(form.pctUC) || 0)));
+    form.pctUC = uc;
+    form.pctEuros = 100 - uc;
+    form.composition = Math.round(Math.min(100, Math.max(0, (uc - 10) / 0.8)));
+  }
+
+  function getAbattementMaxAv(form) {
+    return form.situationFiscale === "couple" ? AV_ABATTEMENT_COUPLE : AV_ABATTEMENT_CELIB;
+  }
+
+  function getTauxNetAv(form) {
+    normalizeAllocationAv(form);
+    return (form.pctEuros / 100) * Number(form.tauxEuro) + (form.pctUC / 100) * Number(form.tauxUC);
+  }
+
+  function fraisVersementAv(form, type) {
+    if (type === "initial") return Number(form.fraisInitial) / 100;
+    if (type === "periodique") return Number(form.fraisPeriodique) / 100;
+    return Number(form.fraisExceptionnel) / 100;
+  }
+
+  function versementBrutFromSaisie(form, montant, type) {
+    var m = Number(montant) || 0;
+    if (m <= 0) return 0;
+    if (form.natureVersements === "nets") {
+      var f = fraisVersementAv(form, type);
+      return f >= 1 ? m : m / (1 - f);
+    }
+    return m;
+  }
+
+  function versementNetFromBrut(form, brut, type) {
+    if (form.natureVersements === "nets") return Number(brut) || 0;
+    return (Number(brut) || 0) * (1 - fraisVersementAv(form, type));
+  }
+
+  function getTauxIRPartAv(ageAns, encoursTotal, choixFiscalite, connaitFiscalite, isPost2017) {
+    if (connaitFiscalite && choixFiscalite && choixFiscalite.indexOf("tmi_") === 0) {
+      return parseInt(choixFiscalite.replace("tmi_", ""), 10) / 100;
+    }
+    if (isPost2017) {
+      if (ageAns < 8) return AV_PFU_IR;
+      if (encoursTotal <= AV_SEUIL_150K) return 0.075;
+      var ratioHaut = Math.min(1, Math.max(0, (encoursTotal - AV_SEUIL_150K) / encoursTotal));
+      return 0.075 * (1 - ratioHaut) + AV_PFU_IR * ratioHaut;
+    }
+    if (ageAns < 4) return 0.35;
+    if (ageAns < 8) return 0.15;
+    return 0.075;
+  }
+
+  function computeFiscaliteRachatAv(ctx) {
+    var pv = Math.max(0, ctx.plusValue || 0);
+    if (pv <= 0) {
+      return { ps: 0, ir: 0, pfo: 0, irCredit: 0, net: ctx.montant, abattementUtilise: 0, detailAvant: null, detailApres: null };
+    }
+    var totalPrimes = ctx.primesAvant + ctx.primesApres;
+    var ratioAvant = totalPrimes > 0 ? ctx.primesAvant / totalPrimes : 0;
+    var pvAvant = pv * ratioAvant;
+    var pvApres = pv * (1 - ratioAvant);
+    var abatt = Math.min(ctx.abattementRestant, pv);
+    var abattAvant = abatt * ratioAvant;
+    var abattApres = abatt * (1 - ratioAvant);
+    var tauxAvant = getTauxIRPartAv(ctx.ageAns, ctx.encoursTotal, ctx.choixAvant, ctx.connaitFiscalite, false);
+    var tauxApres = getTauxIRPartAv(ctx.ageAns, ctx.encoursTotal, ctx.choixApres, ctx.connaitFiscalite, true);
+    var pvImpAvant = Math.max(0, pvAvant - abattAvant);
+    var pvImpApres = Math.max(0, pvApres - abattApres);
+    var irAvant = pvImpAvant * tauxAvant;
+    var irApres = pvImpApres * tauxApres;
+    var pfo = irAvant + irApres;
+    var irCredit = 0;
+    if (pvImpAvant + pvImpApres <= 0 && pv > 0) {
+      pfo = pvAvant * tauxAvant + pvApres * tauxApres;
+      irCredit = -pfo;
+    }
+    var psEuroPart = Math.max(0, pv * ctx.ratioEuro * AV_PS - ctx.psEuroDejaPayesSurPart);
+    var psUcPart = Math.max(0, pv * ctx.ratioUC * AV_PS);
+    var ps = psEuroPart + psUcPart;
+    var impotNet = Math.max(0, pfo + irCredit);
+    return {
+      ps: ps,
+      ir: irCredit,
+      pfo: pfo,
+      irCredit: irCredit,
+      impotNet: impotNet,
+      net: ctx.montant - ps - impotNet,
+      abattementUtilise: abatt,
+      detailAvant: { plusValue: pvAvant, tauxIR: tauxAvant, ir: irAvant, regime: "Primes avant 27/09/2017" },
+      detailApres: { plusValue: pvApres, tauxIR: tauxApres, ir: irApres, regime: "Primes à compter du 27/09/2017" },
+    };
+  }
+
+  function buildAvSchedule(form, start, end) {
+    var events = [];
+    var brutInit = versementBrutFromSaisie(form, form.versementInitial, "initial");
+    if (brutInit > 0) {
+      events.push({ date: new Date(start.getTime()), kind: "versement", brut: brutInit, vType: "initial", after2017: isPrimeApres2017(start) });
+    }
+    (form.versements || []).forEach(function (v) {
+      var d = parseDateAv(v.dateDebut);
+      if (!d) return;
+      var brut = versementBrutFromSaisie(form, v.montant, v.type === "periodique" ? "periodique" : "exceptionnel");
+      if (brut <= 0) return;
+      if (v.type === "exceptionnel") {
+        if (d >= start && d <= end) {
+          events.push({ date: d, kind: "versement", brut: brut, vType: "exceptionnel", after2017: isPrimeApres2017(d) });
+        }
+      } else {
+        var step = v.periodicite === "annuel" ? 12 : v.periodicite === "semestriel" ? 6 : v.periodicite === "trimestriel" ? 3 : 1;
+        var cur = new Date(d.getTime());
+        var idx = 0;
+        while (cur <= end && idx < 600) {
+          if (cur >= start) {
+            var montant = brut * Math.pow(1 + Number(form.indexation) / 100, idx);
+            events.push({ date: new Date(cur.getTime()), kind: "versement", brut: montant, vType: "periodique", after2017: isPrimeApres2017(cur) });
+          }
+          cur = addMonthsAv(cur, step);
+          idx += 1;
+        }
+      }
+    });
+    (form.rachats || []).forEach(function (r) {
+      var d = parseDateAv(r.date);
+      if (!d || d < start || d > end) return;
+      events.push({ date: d, kind: "rachat", type: r.type || "partiel", montant: Number(r.montant) || 0 });
+    });
+    events.sort(function (a, b) { return a.date - b.date; });
+    return events;
+  }
+
+  function defaultAssuranceVieState() {
+    return {
+      tab: "projet",
+      resultSubTab: "capital",
+      calculated: false,
+      results: null,
+      showParametres: false,
+      form: {
+        dateNaissance: "2002-03-17",
+        situationFiscale: "celibataire",
+        encoursAvant2017: 30000,
+        encoursApres2017: 0,
+        connaitFiscalite: true,
+        choixFiscalite: "pfu",
+        choixFiscaliteAvant2017: "auto",
+        choixFiscaliteApres2017: "pfu",
+        abattementDispo: 4200,
+        objectif: "capital_terme",
+        valeurRecherchee: "capital_terme",
+        libelleProduit: "Assurance vie",
+        modeGestion: "libre",
+        dateInvestissement: "2026-07-01",
+        horizonAns: 8,
+        horizonMois: 0,
+        versementInitial: 1000,
+        versements: [],
+        rachats: [],
+        pctUC: 30,
+        pctEuros: 70,
+        euroCroissance: false,
+        tauxEuro: 1.2,
+        tauxUC: 3.5,
+        composition: 25,
+        fraisInitial: 1,
+        fraisPeriodique: 1,
+        fraisExceptionnel: 1,
+        indexation: 0,
+        natureVersements: "bruts",
+        natureRachats: "bruts",
+      },
+    };
+  }
+
+  function computeAssuranceVie(form) {
+    normalizeAllocationAv(form);
+    var start = parseDateAv(form.dateInvestissement);
+    if (!start) return null;
+    var end = addMonthsAv(start, form.horizonAns * 12 + form.horizonMois);
+    if (end <= start) return null;
+
+    var pctE = form.pctEuros / 100;
+    var pctU = form.pctUC / 100;
+    var tauxEuroM = Number(form.tauxEuro) / 100 / 12;
+    var tauxUcM = Number(form.tauxUC) / 100 / 12;
+
+    var capEuro = 0;
+    var capUC = 0;
+    var primesNettes = 0;
+    var primesBrutAvant = Number(form.encoursAvant2017) || 0;
+    var primesBrutApres = Number(form.encoursApres2017) || 0;
+    var totalVersementsBruts = 0;
+    var totalVersementsNets = 0;
+    var totalProduitsBruts = 0;
+    var totalPsEuroAnnuel = 0;
+    var totalRachatsBruts = 0;
+    var totalRachatsNets = 0;
+    var psEuroCumulProduits = 0;
+
+    var rowsByYear = {};
+    var rachatRows = [];
+    var schedule = buildAvSchedule(form, start, end);
+    var abattementRestant = form.connaitFiscalite ? Number(form.abattementDispo) : getAbattementMaxAv(form);
+    if (isNaN(abattementRestant)) abattementRestant = getAbattementMaxAv(form);
+
+    var choixApres = form.connaitFiscalite ? (form.choixFiscaliteApres2017 || form.choixFiscalite || "pfu") : "pfu";
+    var choixAvant = form.connaitFiscalite ? (form.choixFiscaliteAvant2017 === "auto" ? "pfu" : form.choixFiscaliteAvant2017) : "pfu";
+
+    function capitalTotal() { return capEuro + capUC; }
+
+    function ensureYear(y) {
+      if (!rowsByYear[y]) rowsByYear[y] = { year: y, versementsNets: 0, produits: 0, rachatsBruts: 0, psEuro: 0, capital: 0 };
+      return rowsByYear[y];
+    }
+
+    function applyVersement(ev) {
+      var net = versementNetFromBrut(form, ev.brut, ev.vType === "initial" ? "initial" : ev.vType === "periodique" ? "periodique" : "exceptionnel");
+      capEuro += net * pctE;
+      capUC += net * pctU;
+      primesNettes += net;
+      totalVersementsBruts += ev.brut;
+      totalVersementsNets += net;
+      if (ev.after2017) primesBrutApres += ev.brut; else primesBrutAvant += ev.brut;
+      var yr = ensureYear(ev.date.getFullYear());
+      yr.versementsNets += net;
+    }
+
+    function applyRachat(ev) {
+      var cap = capitalTotal();
+      if (cap <= 0) return;
+      var montantBrut = ev.type === "total" ? cap : Math.min(Number(ev.montant) || 0, cap);
+      if (montantBrut <= 0) return;
+      var montant = montantBrut;
+      if (form.natureRachats === "nets") {
+        var plusValueRatio = Math.max(0, cap - primesNettes) / cap;
+        var pvEst = montantBrut * plusValueRatio;
+        var fisEst = computeFiscaliteRachatAv({
+          montant: montantBrut,
+          plusValue: pvEst,
+          primesAvant: primesBrutAvant,
+          primesApres: primesBrutApres,
+          ageAns: diffYearsAv(start, ev.date),
+          encoursTotal: primesBrutAvant + primesBrutApres + totalVersementsBruts,
+          choixAvant: choixAvant,
+          choixApres: choixApres,
+          connaitFiscalite: form.connaitFiscalite,
+          abattementRestant: abattementRestant,
+          ratioEuro: cap > 0 ? capEuro / cap : pctE,
+          ratioUC: cap > 0 ? capUC / cap : pctU,
+          psEuroDejaPayesSurPart: 0,
+        });
+        montant = montantBrut + fisEst.ps + fisEst.impotNet;
+        montant = Math.min(montant, cap);
+      }
+      var ratio = montant / cap;
+      var plusValue = Math.max(0, cap - primesNettes) * ratio;
+      var psDeja = psEuroCumulProduits * ratio;
+      var fis = computeFiscaliteRachatAv({
+        montant: montant,
+        plusValue: plusValue,
+        primesAvant: primesBrutAvant,
+        primesApres: primesBrutApres,
+        ageAns: diffYearsAv(start, ev.date),
+        encoursTotal: primesBrutAvant + primesBrutApres + totalVersementsBruts,
+        choixAvant: choixAvant,
+        choixApres: choixApres,
+        connaitFiscalite: form.connaitFiscalite,
+        abattementRestant: abattementRestant,
+        ratioEuro: capEuro / cap,
+        ratioUC: capUC / cap,
+        psEuroDejaPayesSurPart: psDeja,
+      });
+      abattementRestant = Math.max(0, abattementRestant - fis.abattementUtilise);
+      capEuro -= capEuro * ratio;
+      capUC -= capUC * ratio;
+      primesNettes -= primesNettes * ratio;
+      psEuroCumulProduits -= psDeja;
+      totalRachatsBruts += montant;
+      totalRachatsNets += fis.net;
+      var yr = ensureYear(ev.date.getFullYear());
+      yr.rachatsBruts += montant;
+      rachatRows.push({
+        year: ev.date.getFullYear(),
+        date: ev.date.toISOString().slice(0, 10),
+        rachatBrut: montant,
+        partGain: plusValue,
+        ps: fis.ps,
+        pfo: fis.pfo,
+        ir: fis.ir,
+        net: fis.net,
+        fiscaliteAvant: fis.detailAvant,
+        fiscaliteApres: fis.detailApres,
+      });
+    }
+
+    var cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    var endLimit = new Date(end.getFullYear(), end.getMonth(), 1);
+    schedule.forEach(function (e) { e._done = false; });
+
+    while (cur <= endLimit) {
+      var monthStart = new Date(cur.getFullYear(), cur.getMonth(), 1);
+      var monthEnd = addMonthsAv(monthStart, 1);
+      schedule.forEach(function (ev) {
+        if (ev._done || ev.date < monthStart || ev.date >= monthEnd) return;
+        if (ev.date < start || ev.date > end) return;
+        if (ev.kind === "versement") applyVersement(ev);
+        else applyRachat(ev);
+        ev._done = true;
+      });
+      var effStart = new Date(Math.max(monthStart.getTime(), start.getTime()));
+      var effEnd = new Date(Math.min(monthEnd.getTime(), end.getTime() + 86400000));
+      var monthFrac = monthEnd > monthStart ? (effEnd - effStart) / (monthEnd - monthStart) : 0;
+      monthFrac = Math.max(0, Math.min(1, monthFrac));
+      if (capitalTotal() > 0 && monthFrac > 0) {
+        var gainEuro = capEuro * tauxEuroM * monthFrac;
+        var gainUC = capUC * tauxUcM * monthFrac;
+        var ps = gainEuro * AV_PS;
+        capEuro += gainEuro - ps;
+        capUC += gainUC;
+        totalProduitsBruts += gainEuro + gainUC;
+        totalPsEuroAnnuel += ps;
+        psEuroCumulProduits += ps;
+        var yr = ensureYear(cur.getFullYear());
+        yr.produits += gainEuro + gainUC;
+        yr.psEuro += ps;
+      }
+      ensureYear(cur.getFullYear()).capital = capitalTotal();
+      cur = addMonthsAv(cur, 1);
+    }
+
+    schedule.forEach(function (ev) {
+      if (ev._done) return;
+      if (ev.date < start || ev.date > end) return;
+      if (ev.kind === "versement") applyVersement(ev);
+      else applyRachat(ev);
+      ev._done = true;
+    });
+
+    var rows = Object.keys(rowsByYear).sort().map(function (k) { return rowsByYear[k]; });
+    var capitalBrut = capitalTotal();
+    var ageContrat = diffYearsAv(start, end);
+    var encoursTotal = primesBrutAvant + primesBrutApres + totalVersementsBruts;
+    var gainsTotaux = Math.max(0, totalProduitsBruts);
+    var plusValueFinale = Math.max(0, capitalBrut - primesNettes);
+
+    var fisSortie = computeFiscaliteRachatAv({
+      montant: capitalBrut,
+      plusValue: plusValueFinale,
+      primesAvant: primesBrutAvant,
+      primesApres: primesBrutApres,
+      ageAns: ageContrat,
+      encoursTotal: encoursTotal,
+      choixAvant: choixAvant,
+      choixApres: choixApres,
+      connaitFiscalite: form.connaitFiscalite,
+      abattementRestant: abattementRestant,
+      ratioEuro: capitalBrut > 0 ? capEuro / capitalBrut : pctE,
+      ratioUC: capitalBrut > 0 ? capUC / capitalBrut : pctU,
+      psEuroDejaPayesSurPart: psEuroCumulProduits,
+    });
+
+    var ratioAvant = encoursTotal > 0 ? primesBrutAvant / encoursTotal : 0;
+
+    return {
+      rows: rows,
+      rachatRows: rachatRows,
+      capitalBrut: capitalBrut,
+      capEuro: capEuro,
+      capUC: capUC,
+      totalVersementsBruts: totalVersementsBruts,
+      totalVersementsNets: totalVersementsNets,
+      totalProduitsBruts: totalProduitsBruts,
+      totalRachatsBruts: totalRachatsBruts,
+      totalRachatsNets: totalRachatsNets,
+      totalPsEuroAnnuel: totalPsEuroAnnuel,
+      fiscaliteSortie: {
+        ps: totalPsEuroAnnuel + fisSortie.ps,
+        psAnnuelEuro: totalPsEuroAnnuel,
+        psSortie: fisSortie.ps,
+        pfo: fisSortie.pfo,
+        ir: fisSortie.ir,
+        restitutionPs: 0,
+        gainAvant: plusValueFinale * ratioAvant,
+        gainApres: plusValueFinale * (1 - ratioAvant),
+        gainImposable: Math.max(0, plusValueFinale - abattementRestant),
+        abattement: getAbattementMaxAv(form) - abattementRestant,
+        abattementRestant: abattementRestant,
+        tauxIRAvant: getTauxIRPartAv(ageContrat, encoursTotal, choixAvant, form.connaitFiscalite, false),
+        tauxIRApres: getTauxIRPartAv(ageContrat, encoursTotal, choixApres, form.connaitFiscalite, true),
+        ageContrat: ageContrat,
+        detailAvant: fisSortie.detailAvant,
+        detailApres: fisSortie.detailApres,
+      },
+      epargneNette: capitalBrut - fisSortie.ps - fisSortie.impotNet,
+      tauxNet: getTauxNetAv(form),
+      endDate: end,
+    };
+  }
+
+  function avSelectOptions(values, selected, labelFn) {
+    return values.map(function (v) {
+      var sel = String(v) === String(selected) ? " selected" : "";
+      return "<option value=\"" + v + "\"" + sel + ">" + (labelFn ? labelFn(v) : v) + "</option>";
+    }).join("");
+  }
+
+  function avFiscaliteOptions(selected) {
+    return '<option value="pfu"' + (selected === "pfu" ? " selected" : "") + '>Prélèvement Forfaitaire Unique (PFU)</option>' +
+      '<option value="tmi_0"' + (selected === "tmi_0" ? " selected" : "") + '>Barème IR — TMI 0 %</option>' +
+      '<option value="tmi_11"' + (selected === "tmi_11" ? " selected" : "") + '>Barème IR — TMI 11 %</option>' +
+      '<option value="tmi_30"' + (selected === "tmi_30" ? " selected" : "") + '>Barème IR — TMI 30 %</option>' +
+      '<option value="tmi_41"' + (selected === "tmi_41" ? " selected" : "") + '>Barème IR — TMI 41 %</option>' +
+      '<option value="tmi_45"' + (selected === "tmi_45" ? " selected" : "") + '>Barème IR — TMI 45 %</option>';
+  }
+
+  function getExtraResult(e) {
+    if (!e || e.durabilite === "") return null;
+    if (e.durabilite === "non") return { index: 0, label: "Neutre", description: EXTRA_DESCRIPTIONS.Neutre, envPercent: 0, cards: [] };
+    var pct = parseInt(e.env_percent, 10) || 5;
+    var index = pct >= 50 ? 3 : pct >= 25 ? 2 : 1;
+    var label = EXTRA_LABELS[index];
+    var cards = [
+      { title: "Activités environnementales", text: "Vous souhaitez consacrer au moins " + pct + "% de votre investissement aux entreprises qui agissent positivement sur l'environnement.", pct: pct },
+      { title: "Objectif environnemental ou social", text: "Vous souhaitez qu'au moins " + pct + "% de votre investissement réponde à un objectif d'amélioration de l'environnement ou du social.", pct: pct },
+      { title: "Incidences négatives", text: "Vous souhaitez qu'au moins " + pct + "% de votre investissement soit sélectionné en fonction de son impact sur la durabilité.", pct: pct },
+    ];
+    return { index: index, label: label, description: EXTRA_DESCRIPTIONS[label] || "", envPercent: pct, cards: cards };
+  }
+
   function uid(prefix) {
     return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
   }
@@ -730,11 +1245,14 @@
 
   function viewProfilInvestisseur(params, sim, client) {
     const hashBase = "#/simulateur?id=profil-investisseur" + (client ? "&clientId=" + encodeURIComponent(client.id) : "");
-    window.__profilInvestisseurState = window.__profilInvestisseurState || { stepIndex: 0, answers: {} };
+    window.__profilInvestisseurState = window.__profilInvestisseurState || { stepIndex: 0, answers: {}, risquePhase: "form", pertesPhase: "form", extraPhase: "form" };
     const st = window.__profilInvestisseurState;
     if (st.reset) {
       st.stepIndex = 0;
       st.answers = {};
+      st.risquePhase = "form";
+      st.pertesPhase = "form";
+      st.extraPhase = "form";
       st.reset = false;
     }
     const stepIndex = Math.min(st.stepIndex, PROFIL_INVESTISSEUR_STEPS.length - 1);
@@ -962,32 +1480,46 @@
         '<button type="button" class="profil-ops-btn' + (pertesSubies === "non" ? " is-selected" : "") + '" data-value="non">Non</button></div></div>' +
         "</form>";
     } else if (step.id === "risque") {
-      var scenarioChoice = (a.risque && a.risque.scenario) || "";
-      var v = (a.risque && a.risque.placements) || "";
-      var placementAbc = (a.risque && a.risque.placement_abc) || "";
-      contentHtml =
-        "<h2>Profil investisseur</h2>" +
-        '<p class="step-desc"><strong>Profil de risque</strong></p>' +
-        '<p class="step-desc">Imaginez que l\'ensemble de vos économies soit investi dans un placement sans risque qui vous rapporte un revenu certain de 20 000 € par an. On vous propose de réallouer votre capital pour l\'investir sur des supports risqués qui ont : une chance sur deux (50 %) de vous procurer un revenu annuel double (40 000 €) ; et une chance sur deux de vous procurer un revenu diminué d\'un tiers (13 333 €).</p>' +
-        '<form id="profil-step-form">' +
-        '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
-        '<div class="profil-choice-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">' +
-        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_scenario" value="conserver"' + (scenarioChoice === "conserver" ? " checked" : "") + ' /><span><strong>Je conserve le placement actuel</strong><br/>Garanti · 20 000 € / an</span></label>' +
-        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_scenario" value="accepter"' + (scenarioChoice === "accepter" ? " checked" : "") + ' /><span><strong>J\'accepte le nouveau placement</strong><br/>50 % de chance 40 000 € / an · 50 % de chance 13 333 € / an</span></label>' +
-        "</div></div>" +
-        '<p class="step-desc">En matière de placements financiers, pensez-vous plutôt que :</p>' +
-        '<div class="profil-choice-group" style="margin-bottom: var(--space-lg);">' +
-        '<label><input type="radio" name="profil_risque_placements" value="1"' + (v === "1" ? " checked" : "") + " /> Il ne faut pas prendre de risque ; on doit placer toutes ses économies dans des placements sûrs.</label>" +
-        '<label><input type="radio" name="profil_risque_placements" value="2"' + (v === "2" ? " checked" : "") + " /> On peut placer une petite partie de ses économies sur des placements risqués.</label>" +
-        '<label><input type="radio" name="profil_risque_placements" value="3"' + (v === "3" ? " checked" : "") + " /> On peut placer une part importante de ses économies sur des actifs risqués si le gain en vaut la peine.</label>" +
-        '<label><input type="radio" name="profil_risque_placements" value="4"' + (v === "4" ? " checked" : "") + " /> On doit placer l'essentiel de ses économies sur des actifs risqués dès qu'il y a des chances de gains très importants.</label>" +
-        "</div>" +
-        '<p class="step-desc">Le graphique ci-dessous présente 3 placements. Pour chacun d\'eux, sont représentées les estimations de rendement annuel (en %) sur une période de 8 ans, de la plus pessimiste à la plus optimiste. Choisissez le placement qui vous correspond le mieux.</p>' +
-        '<div class="profil-choice-group">' +
-        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="A"' + (placementAbc === "A" ? " checked" : "") + ' /><span><strong>Placement A</strong><br/>Vous souhaitez limiter au maximum le risque de vos investissements, quitte à en limiter la performance.</span></label>' +
-        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="B"' + (placementAbc === "B" ? " checked" : "") + ' /><span><strong>Placement B</strong><br/>Vous acceptez un risque modéré afin de dynamiser la performance de vos placements.</span></label>' +
-        '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="C"' + (placementAbc === "C" ? " checked" : "") + ' /><span><strong>Placement C</strong><br/>Vous recherchez une très bonne performance, et acceptez de voir votre capital fluctuer à la baisse durant la durée de votre placement.</span></label>' +
-        "</div></form>";
+      var risqueResult = getRisqueResult(a.risque);
+      if (st.risquePhase === "result" && risqueResult) {
+        var risqueBarHtml = RISQUE_LABELS.map(function (lbl, i) {
+          return '<div class="profil-result-segment' + (i === risqueResult.index ? " is-active" : "") + '" data-index="' + i + '">' + escapeHtml(lbl) + "</div>";
+        }).join("");
+        contentHtml =
+          "<h2>Profil investisseur</h2>" +
+          '<p class="step-desc"><strong>Résultats</strong></p>' +
+          '<h3 class="profil-result-title">Profil de risque</h3>' +
+          '<div class="profil-result-bar profil-result-bar-risque" role="img" aria-label="Profil ' + escapeHtml(risqueResult.label) + '">' + risqueBarHtml + "</div>" +
+          '<p class="profil-result-desc">' + escapeHtml(risqueResult.description) + "</p>" +
+          '<button type="button" class="btn btn-link profil-result-modifier" id="profil-modifier-risque">Modifier le profil de risque</button>';
+      } else {
+        var scenarioChoice = (a.risque && a.risque.scenario) || "";
+        var v = (a.risque && a.risque.placements) || "";
+        var placementAbc = (a.risque && a.risque.placement_abc) || "";
+        contentHtml =
+          "<h2>Profil investisseur</h2>" +
+          '<p class="step-desc"><strong>Profil de risque</strong></p>' +
+          '<p class="step-desc">Imaginez que l\'ensemble de vos économies soit investi dans un placement sans risque qui vous rapporte un revenu certain de 20 000 € par an. On vous propose de réallouer votre capital pour l\'investir sur des supports risqués qui ont : une chance sur deux (50 %) de vous procurer un revenu annuel double (40 000 €) ; et une chance sur deux de vous procurer un revenu diminué d\'un tiers (13 333 €).</p>' +
+          '<form id="profil-step-form">' +
+          '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
+          '<div class="profil-choice-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">' +
+          '<label class="profil-scenario-card"><input type="radio" name="profil_risque_scenario" value="conserver"' + (scenarioChoice === "conserver" ? " checked" : "") + ' /><span><strong>Je conserve le placement actuel</strong><br/>Garanti · 20 000 € / an</span></label>' +
+          '<label class="profil-scenario-card"><input type="radio" name="profil_risque_scenario" value="accepter"' + (scenarioChoice === "accepter" ? " checked" : "") + ' /><span><strong>J\'accepte le nouveau placement</strong><br/>50 % de chance 40 000 € / an · 50 % de chance 13 333 € / an</span></label>' +
+          "</div></div>" +
+          '<p class="step-desc">En matière de placements financiers, pensez-vous plutôt que :</p>' +
+          '<div class="profil-choice-group" style="margin-bottom: var(--space-lg);">' +
+          '<label><input type="radio" name="profil_risque_placements" value="1"' + (v === "1" ? " checked" : "") + " /> Il ne faut pas prendre de risque ; on doit placer toutes ses économies dans des placements sûrs.</label>" +
+          '<label><input type="radio" name="profil_risque_placements" value="2"' + (v === "2" ? " checked" : "") + " /> On peut placer une petite partie de ses économies sur des placements risqués.</label>" +
+          '<label><input type="radio" name="profil_risque_placements" value="3"' + (v === "3" ? " checked" : "") + " /> On peut placer une part importante de ses économies sur des actifs risqués si le gain en vaut la peine.</label>" +
+          '<label><input type="radio" name="profil_risque_placements" value="4"' + (v === "4" ? " checked" : "") + " /> On doit placer l'essentiel de ses économies sur des actifs risqués dès qu'il y a des chances de gains très importants.</label>" +
+          "</div>" +
+          '<p class="step-desc">Le graphique ci-dessous présente 3 placements. Pour chacun d\'eux, sont représentées les estimations de rendement annuel (en %) sur une période de 8 ans, de la plus pessimiste à la plus optimiste. Choisissez le placement qui vous correspond le mieux.</p>' +
+          '<div class="profil-choice-group">' +
+          '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="A"' + (placementAbc === "A" ? " checked" : "") + ' /><span><strong>Placement A</strong><br/>Vous souhaitez limiter au maximum le risque de vos investissements, quitte à en limiter la performance.</span></label>' +
+          '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="B"' + (placementAbc === "B" ? " checked" : "") + ' /><span><strong>Placement B</strong><br/>Vous acceptez un risque modéré afin de dynamiser la performance de vos placements.</span></label>' +
+          '<label class="profil-scenario-card"><input type="radio" name="profil_risque_placement_abc" value="C"' + (placementAbc === "C" ? " checked" : "") + ' /><span><strong>Placement C</strong><br/>Vous recherchez une très bonne performance, et acceptez de voir votre capital fluctuer à la baisse durant la durée de votre placement.</span></label>' +
+          "</div></form>";
+      }
     } else if (step.id === "preferences") {
       var checked = (a.preferences && a.preferences.ne_conviennent) || [];
       var opts = [
@@ -1019,66 +1551,101 @@
           .join("") +
         "</div></form>";
     } else if (step.id === "pertes") {
-      var revenus = (a.pertes && a.pertes.revenus_foyer) || "";
-      var epargne = (a.pertes && a.pertes.epargne_mensuelle) || "";
-      contentHtml =
-        "<h2>Profil investisseur</h2>" +
-        '<p class="step-desc"><strong>Capacité à subir des pertes</strong></p>' +
-        '<form id="profil-step-form">' +
-        '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
-        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quels sont les revenus nets annuels de votre foyer ?</label>' +
-        '<div class="profil-choice-group">' +
-        '<label><input type="radio" name="profil_pertes_revenus" value="<25"' + (revenus === "<25" ? " checked" : "") + " /> Inférieur à 25 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_revenus" value="25-50"' + (revenus === "25-50" ? " checked" : "") + " /> Entre 25 000 € et 50 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_revenus" value="50-75"' + (revenus === "50-75" ? " checked" : "") + " /> Entre 50 000 € et 75 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_revenus" value="75-100"' + (revenus === "75-100" ? " checked" : "") + " /> Entre 75 000 € et 100 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_revenus" value="100-150"' + (revenus === "100-150" ? " checked" : "") + " /> Entre 100 000 € et 150 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_revenus" value="150-300"' + (revenus === "150-300" ? " checked" : "") + " /> Entre 150 000 € et 300 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_revenus" value=">300"' + (revenus === ">300" ? " checked" : "") + " /> Plus de 300 000 €</label>" +
-        "</div></div>" +
-        '<div class="form-group">' +
-        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Combien épargnez-vous chaque mois ?</label>' +
-        '<div class="profil-choice-group">' +
-        '<label><input type="radio" name="profil_pertes_epargne" value="0"' + (epargne === "0" ? " checked" : "") + " /> Je n'épargne pas</label>" +
-        '<label><input type="radio" name="profil_pertes_epargne" value="0-500"' + (epargne === "0-500" ? " checked" : "") + " /> Entre 0 et 500 €</label>" +
-        '<label><input type="radio" name="profil_pertes_epargne" value="500-1000"' + (epargne === "500-1000" ? " checked" : "") + " /> Entre 500 et 1 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_epargne" value="1000-2000"' + (epargne === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
-        '<label><input type="radio" name="profil_pertes_epargne" value=">2000"' + (epargne === ">2000" ? " checked" : "") + " /> Plus de 2 000 €</label>" +
-        "</div></div></form>";
+      var pertesResult = getPertesResult(a.pertes);
+      if (st.pertesPhase === "result" && pertesResult) {
+        var pertesBarHtml = PERTES_LABELS.map(function (lbl, i) {
+          return '<div class="profil-result-segment' + (i === pertesResult.index ? " is-active" : "") + '" data-index="' + i + '">' + escapeHtml(lbl) + "</div>";
+        }).join("");
+        contentHtml =
+          "<h2>Profil investisseur</h2>" +
+          '<p class="step-desc"><strong>Résultats</strong></p>' +
+          '<h3 class="profil-result-title">Capacité à subir des pertes</h3>' +
+          '<div class="profil-result-bar profil-result-bar-pertes" role="img" aria-label="Capacité ' + escapeHtml(pertesResult.label) + '">' + pertesBarHtml + "</div>" +
+          '<p class="profil-result-desc">' + escapeHtml(pertesResult.description) + "</p>" +
+          '<button type="button" class="btn btn-link profil-result-modifier" id="profil-modifier-pertes">Modifier la capacité à subir des pertes</button>';
+      } else {
+        var revenus = (a.pertes && a.pertes.revenus_foyer) || "";
+        var epargne = (a.pertes && a.pertes.epargne_mensuelle) || "";
+        contentHtml =
+          "<h2>Profil investisseur</h2>" +
+          '<p class="step-desc"><strong>Capacité à subir des pertes</strong></p>' +
+          '<form id="profil-step-form">' +
+          '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
+          '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quels sont les revenus nets annuels de votre foyer ?</label>' +
+          '<div class="profil-choice-group">' +
+          '<label><input type="radio" name="profil_pertes_revenus" value="<25"' + (revenus === "<25" ? " checked" : "") + " /> Inférieur à 25 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_revenus" value="25-50"' + (revenus === "25-50" ? " checked" : "") + " /> Entre 25 000 € et 50 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_revenus" value="50-75"' + (revenus === "50-75" ? " checked" : "") + " /> Entre 50 000 € et 75 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_revenus" value="75-100"' + (revenus === "75-100" ? " checked" : "") + " /> Entre 75 000 € et 100 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_revenus" value="100-150"' + (revenus === "100-150" ? " checked" : "") + " /> Entre 100 000 € et 150 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_revenus" value="150-300"' + (revenus === "150-300" ? " checked" : "") + " /> Entre 150 000 € et 300 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_revenus" value=">300"' + (revenus === ">300" ? " checked" : "") + " /> Plus de 300 000 €</label>" +
+          "</div></div>" +
+          '<div class="form-group">' +
+          '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Combien épargnez-vous chaque mois ?</label>' +
+          '<div class="profil-choice-group">' +
+          '<label><input type="radio" name="profil_pertes_epargne" value="0"' + (epargne === "0" ? " checked" : "") + " /> Je n'épargne pas</label>" +
+          '<label><input type="radio" name="profil_pertes_epargne" value="0-500"' + (epargne === "0-500" ? " checked" : "") + " /> Entre 0 et 500 €</label>" +
+          '<label><input type="radio" name="profil_pertes_epargne" value="500-1000"' + (epargne === "500-1000" ? " checked" : "") + " /> Entre 500 et 1 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_epargne" value="1000-2000"' + (epargne === "1000-2000" ? " checked" : "") + " /> Entre 1 000 € et 2 000 €</label>" +
+          '<label><input type="radio" name="profil_pertes_epargne" value=">2000"' + (epargne === ">2000" ? " checked" : "") + " /> Plus de 2 000 €</label>" +
+          "</div></div></form>";
+      }
     } else if (step.id === "extra") {
-      var durabilite = (a.extra && a.extra.durabilite) || "";
-      var envPercent = (a.extra && a.extra.env_percent) || "";
-      contentHtml =
-        "<h2>Profil investisseur</h2>" +
-        '<p class="step-desc"><strong>Profil investisseur extra-financier</strong> — Critères ESG et durabilité.</p>' +
-        '<form id="profil-step-form">' +
-        '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
-        '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Souhaitez-vous préciser vos préférences en matière de durabilité ?</label>' +
-        '<div class="profil-ops-group" data-name="profil_extra_durabilite">' +
-        '<button type="button" class="profil-ops-btn' + (durabilite === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
-        '<button type="button" class="profil-ops-btn' + (durabilite === "non" ? " is-selected" : "") + '" data-value="non">Non</button>' +
-        "</div></div>" +
-        (durabilite === "oui"
-          ? '<div class="form-group" style="margin-bottom: var(--space-lg);"><label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quelle part de votre investissement souhaitez-vous consacrer à des activités environnementales ?</label>' +
-            '<div class="profil-choice-group">' +
-            '<label><input type="radio" name="profil_extra_env_percent" value="5"' + (envPercent === "5" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 5 % de votre investissement.</label>" +
-            '<label><input type="radio" name="profil_extra_env_percent" value="25"' + (envPercent === "25" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 25 % de votre investissement.</label>" +
-            '<label><input type="radio" name="profil_extra_env_percent" value="50"' + (envPercent === "50" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 50 % de votre investissement.</label>" +
-            "</div></div>" +
-            '<p class="about-text">Vous avez indiqué vouloir investir dans des activités environnementales. Les instruments financiers qui correspondent à ce choix font partie de la catégorie Taxonomie. Veuillez noter que ce choix est susceptible d\'impacter la liste des supports dans lesquels vous pourriez investir.</p>'
-          : "") +
-        "</form>";
+      var extraRes = getExtraResult(a.extra);
+      if (st.extraPhase === "result" && extraRes) {
+        var extraBarHtml = EXTRA_LABELS.map(function (lbl, i) {
+          return '<div class="profil-result-segment' + (i === extraRes.index ? " is-active" : "") + '" data-index="' + i + '">' + escapeHtml(lbl) + "</div>";
+        }).join("");
+        var cardsHtml = extraRes.cards && extraRes.cards.length ? extraRes.cards.map(function (card) {
+          return '<div class="profil-extra-card"><div class="profil-extra-card-pct">' + (card.pct || 0) + '%</div><h4>' + escapeHtml(card.title) + "</h4><p>" + escapeHtml(card.text) + "</p></div>";
+        }).join("") : "";
+        contentHtml =
+          "<h2>Profil investisseur</h2>" +
+          '<p class="step-desc"><strong>Récapitulatif de votre profil extra-financier</strong></p>' +
+          '<h3 class="profil-result-title">Sensibilité extra-financière</h3>' +
+          '<div class="profil-result-bar profil-result-bar-extra" role="img" aria-label="Sensibilité ' + escapeHtml(extraRes.label) + '">' + extraBarHtml + "</div>" +
+          '<p class="profil-result-desc">' + escapeHtml(extraRes.description) + "</p>" +
+          (cardsHtml ? '<div class="profil-extra-cards">' + cardsHtml + "</div>" : "") +
+          '<button type="button" class="btn btn-link profil-result-modifier" id="profil-modifier-extra">Modifier le profil extra-financier</button>';
+      } else {
+        var durabilite = (a.extra && a.extra.durabilite) || "";
+        var envPercent = (a.extra && a.extra.env_percent) || "";
+        contentHtml =
+          "<h2>Profil investisseur</h2>" +
+          '<p class="step-desc"><strong>Profil investisseur extra-financier</strong> — Critères ESG et durabilité.</p>' +
+          '<form id="profil-step-form">' +
+          '<div class="form-group" style="margin-bottom: var(--space-lg);">' +
+          '<label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Souhaitez-vous préciser vos préférences en matière de durabilité ?</label>' +
+          '<div class="profil-ops-group" data-name="profil_extra_durabilite">' +
+          '<button type="button" class="profil-ops-btn' + (durabilite === "oui" ? " is-selected" : "") + '" data-value="oui">Oui</button>' +
+          '<button type="button" class="profil-ops-btn' + (durabilite === "non" ? " is-selected" : "") + '" data-value="non">Non</button>' +
+          "</div></div>" +
+          (durabilite === "oui"
+            ? '<div class="form-group" style="margin-bottom: var(--space-lg);"><label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Quelle part de votre investissement souhaitez-vous consacrer à des activités environnementales ?</label>' +
+              '<div class="profil-choice-group">' +
+              '<label><input type="radio" name="profil_extra_env_percent" value="5"' + (envPercent === "5" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 5 % de votre investissement.</label>" +
+              '<label><input type="radio" name="profil_extra_env_percent" value="25"' + (envPercent === "25" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 25 % de votre investissement.</label>" +
+              '<label><input type="radio" name="profil_extra_env_percent" value="50"' + (envPercent === "50" ? " checked" : "") + " /> Vous souhaitez y consacrer au moins 50 % de votre investissement.</label>" +
+              "</div></div>" +
+              '<p class="about-text">Vous avez indiqué vouloir investir dans des activités environnementales. Les instruments financiers qui correspondent à ce choix font partie de la catégorie Taxonomie. Veuillez noter que ce choix est susceptible d\'impacter la liste des supports dans lesquels vous pourriez investir.</p>'
+            : "") +
+          "</form>";
+      }
     } else {
       var recapConnaissance = (a.connaissance) ? "Monétaires op. " + (a.connaissance.monetaire_ops || "—") + " ; Obligataires op. " + (a.connaissance.obligataire_ops || "—") + " ; Actions op. " + (a.connaissance.actions_ops || "—") + " ; Défiscalisation " + (a.connaissance.defiscalisation || "—") + " ; Effet de levier " + (a.connaissance.levier || "—") : "—";
-      var recapRisque = (a.risque) ? ["Scénario " + (a.risque.scenario || "—"), "Placements " + (a.risque.placements || "—"), "Placement A/B/C " + (a.risque.placement_abc || "—")].filter(Boolean).join(" ; ") : "—";
+      var risqueResRecap = getRisqueResult(a.risque);
+      var recapRisque = risqueResRecap ? "Profil : " + risqueResRecap.label + " — " + (a.risque.scenario || "—") + " / " + (a.risque.placements || "—") + " / " + (a.risque.placement_abc || "—") : "—";
+      var pertesResRecap = getPertesResult(a.pertes);
+      var recapPertesLabel = pertesResRecap ? pertesResRecap.label : "";
       contentHtml =
         "<h2>Profil investisseur</h2>" +
         '<p class="step-desc"><strong>Récapitulatif</strong> — Voici la synthèse de vos réponses.</p>' +
         '<div class="profil-recap-block"><h3>Connaissance et expérience</h3><p>' + recapConnaissance + "</p></div>" +
         '<div class="profil-recap-block"><h3>Profil de risque</h3><p>' + recapRisque + "</p></div>" +
         '<div class="profil-recap-block"><h3>Préférences de placement</h3><p>Objectifs ne convenant pas : ' + ((a.preferences && a.preferences.ne_conviennent && a.preferences.ne_conviennent.length) ? a.preferences.ne_conviennent.join(", ") : "Aucun.") + ".</p></div>" +
-        '<div class="profil-recap-block"><h3>Capacité à subir des pertes</h3><p>Revenus foyer : ' + ((a.pertes && a.pertes.revenus_foyer) || "—") + " ; Épargne mensuelle : " + ((a.pertes && a.pertes.epargne_mensuelle) || "—") + ".</p></div>" +
-        '<div class="profil-recap-block"><h3>Extra-financier</h3><p>Durabilité : ' + ((a.extra && a.extra.durabilite) || "—") + ((a.extra && a.extra.durabilite === "oui" && a.extra.env_percent) ? " ; Part environnement : " + a.extra.env_percent + " %" : "") + ".</p></div>" +
+        '<div class="profil-recap-block"><h3>Capacité à subir des pertes</h3><p>' + (recapPertesLabel ? "Capacité : " + recapPertesLabel + ". " : "") + "Revenus foyer : " + ((a.pertes && a.pertes.revenus_foyer) || "—") + " ; Épargne mensuelle : " + ((a.pertes && a.pertes.epargne_mensuelle) || "—") + ".</p></div>" +
+        '<div class="profil-recap-block"><h3>Extra-financier</h3><p>' + (getExtraResult(a.extra) ? "Sensibilité : " + getExtraResult(a.extra).label + ". " : "") + "Durabilité : " + ((a.extra && a.extra.durabilite) || "—") + ((a.extra && a.extra.durabilite === "oui" && a.extra.env_percent) ? " ; Part environnement : " + a.extra.env_percent + " %" : "") + ".</p></div>" +
         '<p class="about-text" style="margin-top: 1rem;">Vous pouvez imprimer cette page (Ctrl+P / Cmd+P) pour conserver un document PDF.</p>';
     }
 
@@ -1095,6 +1662,47 @@
       "</div></div>";
 
     render('<section class="profil-wizard">' + sidebarHtml + '<div class="profil-wizard-content">' + contentHtml + actionsHtml + "</div></section>");
+
+    function validateProfilStep(stepId) {
+      if (stepId === "intro") {
+        var cb = document.querySelector('input[name="profil_intro_comprend_objectif"]:checked');
+        if (!cb) return { valid: false, message: "Veuillez cocher « Je comprends l'objectif de ce questionnaire » pour continuer." };
+        return { valid: true };
+      }
+      if (stepId === "connaissance") {
+        var mt = document.querySelector('input[name="profil_c_montant_transaction"]:checked');
+        var ps = document.querySelector("[data-name='profil_c_pertes_subies'] .profil-ops-btn.is-selected");
+        if (!mt) return { valid: false, message: "Veuillez indiquer le montant de transaction des 12 derniers mois." };
+        if (!ps) return { valid: false, message: "Veuillez indiquer si vous avez déjà subi des pertes sur vos placements." };
+        return { valid: true };
+      }
+      if (stepId === "risque") {
+        var sc = document.querySelector('input[name="profil_risque_scenario"]:checked');
+        var pl = document.querySelector('input[name="profil_risque_placements"]:checked');
+        var abc = document.querySelector('input[name="profil_risque_placement_abc"]:checked');
+        if (!sc) return { valid: false, message: "Veuillez choisir entre conserver le placement actuel ou accepter le nouveau placement." };
+        if (!pl) return { valid: false, message: "Veuillez répondre à la question sur les placements financiers." };
+        if (!abc) return { valid: false, message: "Veuillez choisir le placement (A, B ou C) qui vous correspond." };
+        return { valid: true };
+      }
+      if (stepId === "pertes") {
+        var rev = document.querySelector('input[name="profil_pertes_revenus"]:checked');
+        var ep = document.querySelector('input[name="profil_pertes_epargne"]:checked');
+        if (!rev) return { valid: false, message: "Veuillez indiquer les revenus nets annuels de votre foyer." };
+        if (!ep) return { valid: false, message: "Veuillez indiquer combien vous épargnez chaque mois." };
+        return { valid: true };
+      }
+      if (stepId === "extra") {
+        var dur = document.querySelector("[data-name='profil_extra_durabilite'] .profil-ops-btn.is-selected");
+        if (!dur) return { valid: false, message: "Veuillez indiquer si vous souhaitez préciser vos préférences en matière de durabilité." };
+        if (dur.getAttribute("data-value") === "oui") {
+          var env = document.querySelector('input[name="profil_extra_env_percent"]:checked');
+          if (!env) return { valid: false, message: "Veuillez choisir la part d'investissement consacrée aux activités environnementales." };
+        }
+        return { valid: true };
+      }
+      return { valid: true };
+    }
 
     function collectProfilAnswers() {
       var form = document.getElementById("profil-step-form");
@@ -1216,17 +1824,550 @@
     var nextBtn = document.getElementById("profil-next");
     if (nextBtn)
       nextBtn.addEventListener("click", function () {
+        if (step.id === "risque" && st.risquePhase === "result") {
+          st.stepIndex = stepIndex + 1;
+          window.location.hash = hashBase;
+          route();
+          return;
+        }
+        if (step.id === "pertes" && st.pertesPhase === "result") {
+          st.stepIndex = stepIndex + 1;
+          window.location.hash = hashBase;
+          route();
+          return;
+        }
+        if (step.id === "extra" && st.extraPhase === "result") {
+          st.stepIndex = stepIndex + 1;
+          window.location.hash = hashBase;
+          route();
+          return;
+        }
+        var validation = validateProfilStep(step.id);
+        if (!validation.valid) {
+          alert(validation.message);
+          return;
+        }
         var collected = collectProfilAnswers();
         Object.keys(collected).forEach(function (k) {
           st.answers[k] = st.answers[k] || {};
           Object.keys(collected[k]).forEach(function (key) { st.answers[k][key] = collected[k][key]; });
         });
+        if (step.id === "risque") {
+          st.risquePhase = "result";
+          window.location.hash = hashBase;
+          route();
+          return;
+        }
+        if (step.id === "pertes") {
+          st.pertesPhase = "result";
+          window.location.hash = hashBase;
+          route();
+          return;
+        }
+        if (step.id === "extra") {
+          st.extraPhase = "result";
+          window.location.hash = hashBase;
+          route();
+          return;
+        }
         st.stepIndex = stepIndex + 1;
         window.location.hash = hashBase;
         route();
       });
+
+    var modRisque = document.getElementById("profil-modifier-risque");
+    if (modRisque) modRisque.addEventListener("click", function () { st.risquePhase = "form"; window.location.hash = hashBase; route(); });
+    var modPertes = document.getElementById("profil-modifier-pertes");
+    if (modPertes) modPertes.addEventListener("click", function () { st.pertesPhase = "form"; window.location.hash = hashBase; route(); });
+    var modExtra = document.getElementById("profil-modifier-extra");
+    if (modExtra) modExtra.addEventListener("click", function () { st.extraPhase = "form"; window.location.hash = hashBase; route(); });
+
     var pdfBtn = document.getElementById("profil-pdf");
     if (pdfBtn) pdfBtn.addEventListener("click", function () { window.print(); });
+  }
+
+  function viewAssuranceVie(params, sim, client) {
+    var hashBase = "#/simulateur?id=assurance-vie" + (client ? "&clientId=" + encodeURIComponent(client.id) : "");
+    if (!window.__assuranceVieState || window.__assuranceVieState.reset) {
+      window.__assuranceVieState = defaultAssuranceVieState();
+      window.__assuranceVieState.reset = false;
+    }
+    var st = window.__assuranceVieState;
+    var f = st.form;
+    var defs = defaultAssuranceVieState().form;
+    Object.keys(defs).forEach(function (k) {
+      if (f[k] === undefined) f[k] = defs[k];
+    });
+    var res = st.results;
+    var tauxNet = getTauxNetAv(f);
+
+    function renderVersementRows() {
+      var montants = [0, 100, 250, 500, 1000, 2000, 5000, 10000, 20000];
+      return (f.versements || []).map(function (v, i) {
+        var mOpts = montants.indexOf(Number(v.montant)) >= 0 ? montants : montants.concat([Number(v.montant) || 0]).sort(function (a, b) { return a - b; });
+        return '<div class="av-dynamic-row" data-vidx="' + i + '">' +
+          '<select class="form-control av-v-type" data-vidx="' + i + '">' +
+          '<option value="exceptionnel"' + (v.type === "exceptionnel" ? " selected" : "") + '>Versement exceptionnel</option>' +
+          '<option value="periodique"' + (v.type === "periodique" ? " selected" : "") + '>Versement périodique</option>' +
+          '</select>' +
+          '<select class="form-control av-v-montant" data-vidx="' + i + '">' +
+          avSelectOptions(mOpts, v.montant || 0, function (mv) { return fmtEuroAv(mv); }) +
+          '</select>' +
+          (v.type === "periodique" ? '<select class="form-control av-v-periodicite" data-vidx="' + i + '">' +
+            '<option value="mensuel"' + ((v.periodicite || "mensuel") === "mensuel" ? " selected" : "") + '>Mensuel</option>' +
+            '<option value="trimestriel"' + (v.periodicite === "trimestriel" ? " selected" : "") + '>Trimestriel</option>' +
+            '<option value="semestriel"' + (v.periodicite === "semestriel" ? " selected" : "") + '>Semestriel</option>' +
+            '<option value="annuel"' + (v.periodicite === "annuel" ? " selected" : "") + '>Annuel</option>' +
+          '</select>' : '<span></span>') +
+          '<input class="form-control av-v-date" type="date" data-vidx="' + i + '" value="' + escapeHtml(v.dateDebut || f.dateInvestissement) + '" />' +
+          '<button type="button" class="btn btn-outline av-v-del" data-vidx="' + i + '" aria-label="Supprimer">✕</button>' +
+        '</div>';
+      }).join("");
+    }
+
+    function renderRachatRows() {
+      var montants = [0, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+      return (f.rachats || []).map(function (r, i) {
+        var mOpts = montants.indexOf(Number(r.montant)) >= 0 ? montants : montants.concat([Number(r.montant) || 0]).sort(function (a, b) { return a - b; });
+        return '<div class="av-dynamic-row" data-ridx="' + i + '">' +
+          '<select class="form-control av-r-type" data-ridx="' + i + '">' +
+          '<option value="partiel"' + ((r.type || "partiel") === "partiel" ? " selected" : "") + '>Rachat partiel</option>' +
+          '<option value="total"' + (r.type === "total" ? " selected" : "") + '>Rachat total</option>' +
+          '</select>' +
+          '<select class="form-control av-r-montant" data-ridx="' + i + '" ' + (r.type === "total" ? "disabled" : "") + '>' +
+          avSelectOptions(mOpts, r.montant || 0, function (mv) { return fmtEuroAv(mv); }) +
+          '</select>' +
+          '<input class="form-control av-r-date" type="date" data-ridx="' + i + '" value="' + escapeHtml(r.date || f.dateInvestissement) + '" />' +
+          '<button type="button" class="btn btn-outline av-r-del" data-ridx="' + i + '" aria-label="Supprimer">✕</button>' +
+        '</div>';
+      }).join("");
+    }
+
+    function renderSidebar() {
+      if (!st.calculated || !res) {
+        return '<aside class="av-sidebar" id="av-sidebar"><h3 class="section-title">Résultats</h3><div class="av-sidebar-empty"><p class="about-text">Pas de résultats à afficher</p><p class="av-hint">Modifiez les paramètres puis cliquez sur Calculer — ou activez l\'aperçu automatique.</p></div></aside>';
+      }
+      var fis = res.fiscaliteSortie;
+      return '<aside class="av-sidebar" id="av-sidebar">' +
+        '<details class="av-accordion" open><summary>Chiffres-clés</summary>' +
+          '<div class="av-kpi-block"><div class="av-kpi-label">Capital brut</div><div class="av-kpi-value" id="av-kpi-capital">' + fmtEuroAv(res.capitalBrut) + '</div>' +
+          '<p class="av-kpi-hint">Répartition : ' + f.pctEuros + ' % fonds euros / ' + f.pctUC + ' % UC — Taux net ' + res.tauxNet.toFixed(2).replace(".", ",") + ' %</p></div>' +
+          '<div class="av-kpi-block"><div class="av-kpi-label">Épargne nette (rachat total au terme)</div><div class="av-kpi-value" id="av-kpi-net">' + fmtEuroAv(res.epargneNette) + '</div></div>' +
+          '<div class="av-kpi-mini"><span>Produits bruts</span><strong id="av-kpi-produits">' + fmtEuroAv(res.totalProduitsBruts) + '</strong></div>' +
+        '</details>' +
+        (st.tab === "resultats" ? '<details class="av-accordion" open><summary>Résultats détaillés</summary>' +
+          '<div class="av-kpi-block av-kpi-dark"><div class="av-kpi-label">Capital brut</div><div class="av-kpi-value">' + fmtEuroAv(res.capitalBrut) + '</div>' +
+          '<ul class="av-kpi-list"><li>Total des versements bruts : ' + fmtEuroAv(res.totalVersementsBruts) + '</li>' +
+          '<li>Total des rachats bruts : ' + fmtEuroAv(res.totalRachatsBruts) + '</li>' +
+          '<li>Total des produits bruts : ' + fmtEuroAv(res.totalProduitsBruts) + '</li></ul></div>' +
+          '<div class="av-kpi-block"><div class="av-kpi-label">Épargne nette lors du rachat total</div><div class="av-kpi-value">' + fmtEuroAv(res.epargneNette) + '</div>' +
+          '<ul class="av-kpi-list"><li>Prélèvements sociaux (total) : ' + fmtEuroAv(fis.ps) + '</li>' +
+          '<li>dont PS annuels fonds euros : ' + fmtEuroAv(fis.psAnnuelEuro) + '</li>' +
+          '<li>dont PS à la sortie : ' + fmtEuroAv(fis.psSortie) + '</li>' +
+          '<li>Prélèvement forfaitaire obligatoire : ' + fmtEuroAv(fis.pfo) + '</li>' +
+          '<li>Impôt sur le revenu (crédit) : ' + fmtEuroAv(fis.ir) + '</li></ul></div>' +
+          '<div class="av-fiscal-note"><strong>Fiscalité détaillée</strong>' +
+          '<p>Âge du contrat simulé : ' + fis.ageContrat.toFixed(1).replace(".", ",") + ' ans</p>' +
+          '<p><u>Primes avant 27/09/2017</u> — Taux IR/PFL : ' + (fis.tauxIRAvant * 100).toFixed(1).replace(".", ",") + ' % — Plus-value : ' + fmtEuroAv(fis.gainAvant) + '</p>' +
+          '<p><u>Primes à compter du 27/09/2017</u> — Taux IR/PFU : ' + (fis.tauxIRApres * 100).toFixed(1).replace(".", ",") + ' % — Plus-value : ' + fmtEuroAv(fis.gainApres) + '</p>' +
+          '<p>Abattement consommé : ' + fmtEuroAv(fis.abattement) + ' — Reste disponible : ' + fmtEuroAv(fis.abattementRestant) + '</p></div></details>' : '') +
+      '</aside>';
+    }
+
+    function renderRachatTable() {
+      if (!res || !res.rachatRows.length) {
+        return '<p class="about-text">Aucun rachat programmé. Ajoutez un rachat dans l\'onglet « Votre projet » pour voir la fiscalité appliquée.</p>';
+      }
+      return '<table class="app-table av-table"><thead><tr><th>Date</th><th>Rachat brut</th><th>Plus-value</th><th>PS</th><th>PFO</th><th>IR (crédit)</th><th>Net perçu</th><th>Fiscalité avant 2017</th><th>Fiscalité après 2017</th></tr></thead><tbody>' +
+        res.rachatRows.map(function (r) {
+          var da = r.fiscaliteAvant ? r.fiscaliteAvant.tauxIR * 100 : 0;
+          var dp = r.fiscaliteApres ? r.fiscaliteApres.tauxIR * 100 : 0;
+          return '<tr><td>' + escapeHtml(r.date) + '</td><td>' + fmtEuroAv(r.rachatBrut) + '</td><td>' + fmtEuroAv(r.partGain) + '</td><td>' + fmtEuroAv(r.ps) + '</td><td>' + fmtEuroAv(r.pfo) + '</td><td>' + fmtEuroAv(r.ir) + '</td><td>' + fmtEuroAv(r.net) + '</td>' +
+            '<td>' + da.toFixed(1).replace(".", ",") + ' % / ' + fmtEuroAv(r.fiscaliteAvant ? r.fiscaliteAvant.plusValue : 0) + '</td>' +
+            '<td>' + dp.toFixed(1).replace(".", ",") + ' % / ' + fmtEuroAv(r.fiscaliteApres ? r.fiscaliteApres.plusValue : 0) + '</td></tr>';
+        }).join("") + '</tbody></table>';
+    }
+
+    function renderResultTable() {
+      if (!res) return "";
+      if (st.resultSubTab === "rachat") return renderRachatTable();
+      var tot = { vn: 0, pr: 0, rb: 0, ps: 0, cap: 0 };
+      var body = res.rows.map(function (r) {
+        tot.vn += r.versementsNets; tot.pr += r.produits; tot.rb += r.rachatsBruts; tot.ps += r.psEuro; tot.cap = r.capital;
+        return '<tr><td>' + r.year + '</td><td>' + fmtEuroAv(r.versementsNets) + '</td><td>' + fmtEuroAv(r.produits) + '</td><td>' + fmtEuroAv(r.rachatsBruts) + '</td><td>' + fmtEuroAv(r.psEuro) + '</td><td>' + fmtEuroAv(r.capital) + '</td></tr>';
+      }).join("");
+      return '<table class="app-table av-table"><thead><tr><th>Années</th><th>Versements nets</th><th>Produits</th><th>Rachats bruts</th><th>Prélèvements sociaux sur fonds euros</th><th>Capital en fin d\'année</th></tr></thead><tbody>' + body +
+        '<tr class="av-table-total"><td><strong>Total</strong></td><td><strong>' + fmtEuroAv(tot.vn) + '</strong></td><td><strong>' + fmtEuroAv(tot.pr) + '</strong></td><td><strong>' + fmtEuroAv(tot.rb) + '</strong></td><td><strong>' + fmtEuroAv(tot.ps) + '</strong></td><td><strong>' + fmtEuroAv(tot.cap) + '</strong></td></tr></tbody></table>';
+    }
+
+    setTitle(sim.title, sim.desc);
+    setActions('<a class="btn btn-outline" href="#/simulations' + (client ? "?clientId=" + encodeURIComponent(client.id) : "") + '">Retour</a>' +
+      (client ? '<span class="pill pill-accent">Client : ' + escapeHtml((client.prenom ? client.prenom + " " : "") + (client.nom || "")) + '</span>' : ""));
+
+    var dateInvLabel = f.dateInvestissement ? formatDate(f.dateInvestissement) : "—";
+
+    var html = '<section class="av-simulator">' +
+      '<div class="av-tabs"><button type="button" class="av-tab' + (st.tab === "projet" ? " is-active" : "") + '" data-av-tab="projet">Votre projet</button>' +
+      '<button type="button" class="av-tab' + (st.tab === "resultats" ? " is-active" : "") + '" data-av-tab="resultats"' + (!st.calculated ? " disabled" : "") + '>Résultats détaillés</button></div>' +
+      '<div class="av-layout">';
+
+    if (st.tab === "projet") {
+      html += '<div class="av-main"><form class="av-form" id="av-form">' +
+        '<div class="av-section"><h3 class="about-subtitle">Situation</h3>' +
+          '<div class="app-form av-grid">' +
+            '<div class="form-group"><label for="av-naissance">Date de naissance <span class="req">*</span></label><input id="av-naissance" class="form-control" type="date" name="dateNaissance" value="' + escapeHtml(f.dateNaissance) + '" required /></div>' +
+            '<div class="form-group"><label for="av-situation">Situation fiscale du foyer</label><select id="av-situation" class="form-control" name="situationFiscale">' +
+              '<option value="celibataire"' + (f.situationFiscale === "celibataire" ? " selected" : "") + '>Célibataire / Divorcé (abattement 4 600 €)</option>' +
+              '<option value="couple"' + (f.situationFiscale === "couple" ? " selected" : "") + '>Couple marié / Pacsé (abattement 9 200 €)</option>' +
+            '</select></div>' +
+            '<div class="form-group span-2"><label>Encours des contrats d\'assurance vie et de capitalisation détenus</label></div>' +
+            '<div class="form-group"><label for="av-avant">Lié aux primes versées avant le 27/09/2017</label><select id="av-avant" class="form-control" name="encoursAvant2017">' +
+              avSelectOptions([0, 5000, 10000, 15000, 20000, 30000, 50000, 75000, 100000, 150000, 200000, 300000], f.encoursAvant2017, function (v) { return fmtEuroAv(v); }) +
+            '</select></div>' +
+            '<div class="form-group"><label for="av-apres">Lié aux primes versées à compter du 27/09/2017</label><select id="av-apres" class="form-control" name="encoursApres2017">' +
+              avSelectOptions([0, 5000, 10000, 15000, 20000, 30000, 50000, 75000, 100000, 150000, 200000, 300000], f.encoursApres2017, function (v) { return fmtEuroAv(v); }) +
+            '</select></div>' +
+            '<div class="form-group span-2 av-toggle-row"><label class="av-switch"><input type="checkbox" name="connaitFiscalite"' + (f.connaitFiscalite ? " checked" : "") + ' /><span>Vous connaissez votre fiscalité</span></label></div>' +
+            (f.connaitFiscalite ? '<div class="form-group"><label for="av-fisc-avant">Fiscalité — Primes avant 27/09/2017</label><select id="av-fisc-avant" class="form-control" name="choixFiscaliteAvant2017">' +
+              '<option value="auto"' + ((f.choixFiscaliteAvant2017 || "auto") === "auto" ? " selected" : "") + '>Barème automatique (35 % / 15 % / 7,5 %)</option>' +
+              avFiscaliteOptions(f.choixFiscaliteAvant2017 === "auto" ? "pfu" : f.choixFiscaliteAvant2017) +
+            '</select></div>' +
+            '<div class="form-group"><label for="av-fisc-apres">Fiscalité — Primes à compter du 27/09/2017</label><select id="av-fisc-apres" class="form-control" name="choixFiscaliteApres2017">' +
+              avFiscaliteOptions(f.choixFiscaliteApres2017 || f.choixFiscalite || "pfu") +
+            '</select></div>' +
+            '<div class="form-group"><label for="av-abatt">Abattement maximum disponible</label><select id="av-abatt" class="form-control" name="abattementDispo">' +
+              avSelectOptions(
+                [0, 1000, 2000, 3000, 4200, 4600, 5000, 7500, 9200, getAbattementMaxAv(f)],
+                f.abattementDispo,
+                function (v) { return fmtEuroAv(v); }
+              ) +
+            '</select></div>' : '') +
+          '</div></div>' +
+
+        '<div class="av-section"><h3 class="about-subtitle">Définition du projet</h3><div class="app-form av-grid">' +
+          '<div class="form-group"><label for="av-objectif">Objectif</label><select id="av-objectif" class="form-control" name="objectif">' +
+            '<option value="capital_terme"' + (f.objectif === "capital_terme" ? " selected" : "") + '>Disposer d\'un capital au terme</option>' +
+            '<option value="revenus"' + (f.objectif === "revenus" ? " selected" : "") + '>Disposer de revenus complémentaires</option>' +
+            '<option value="effort"' + (f.objectif === "effort" ? " selected" : "") + '>Déterminer un effort d\'épargne</option>' +
+          '</select></div>' +
+          '<div class="form-group"><label for="av-valeur">Valeur recherchée</label><select id="av-valeur" class="form-control" name="valeurRecherchee">' +
+            '<option value="capital_terme"' + (f.valeurRecherchee === "capital_terme" ? " selected" : "") + '>Capital au terme</option>' +
+            '<option value="rente"' + (f.valeurRecherchee === "rente" ? " selected" : "") + '>Rente viagère</option>' +
+          '</select></div>' +
+          '<div class="form-group"><label for="av-libelle">Libellé du produit</label><input id="av-libelle" class="form-control" type="text" name="libelleProduit" value="' + escapeHtml(f.libelleProduit) + '" /></div>' +
+          '<div class="form-group"><label for="av-date">Investissement en <span class="req">*</span></label><input id="av-date" class="form-control" type="date" name="dateInvestissement" value="' + escapeHtml(f.dateInvestissement) + '" required /></div>' +
+          '<div class="form-group"><label>Horizon de placement</label><div class="av-horizon">' +
+            '<select class="form-control" name="horizonAns">' + [0,1,2,3,4,5,6,7,8,9,10,12,15,20,25,30].map(function (n) { return '<option value="' + n + '"' + (f.horizonAns === n ? " selected" : "") + '>' + n + ' ans</option>'; }).join("") + '</select>' +
+            '<select class="form-control" name="horizonMois">' + [0,1,2,3,4,5,6,7,8,9,10,11].map(function (n) { return '<option value="' + n + '"' + (f.horizonMois === n ? " selected" : "") + '>' + n + ' mois</option>'; }).join("") + '</select>' +
+          '</div></div></div></div>' +
+
+        '<div class="av-section"><h3 class="about-subtitle">Versements</h3>' +
+          '<div class="form-group"><label for="av-vi">Versement initial</label><select id="av-vi" class="form-control" name="versementInitial">' +
+            avSelectOptions([0, 500, 1000, 2000, 3000, 5000, 10000, 20000, 50000, 100000], f.versementInitial, function (v) { return fmtEuroAv(v) + " (" + (f.natureVersements === "nets" ? "net" : "brut") + ")"; }) +
+          '</select> <span class="av-hint">à la date du ' + dateInvLabel + '</span></div>' +
+          '<div id="av-versements-list">' + renderVersementRows() + '</div>' +
+          '<button type="button" class="btn btn-outline" id="av-add-versement">Ajouter un versement</button></div>' +
+
+        '<div class="av-section"><h3 class="about-subtitle">Rachats</h3><div id="av-rachats-list">' + renderRachatRows() + '</div>' +
+          '<button type="button" class="btn btn-outline" id="av-add-rachat">Ajouter un rachat</button></div>' +
+
+        '<div class="av-section"><h3 class="about-subtitle">Modalités de gestion <span class="info-icon" title="Allocation et rendements">ⓘ</span></h3><div class="app-form av-grid">' +
+          '<div class="form-group"><label for="av-mode">Mode de gestion de l\'allocation</label><select id="av-mode" class="form-control" name="modeGestion">' +
+            '<option value="libre"' + (f.modeGestion === "libre" ? " selected" : "") + '>Libre</option>' +
+            '<option value="pilotee"' + (f.modeGestion === "pilotee" ? " selected" : "") + '>Pilotée</option>' +
+            '<option value="mandat"' + (f.modeGestion === "mandat" ? " selected" : "") + '>Sous mandat</option>' +
+          '</select></div>' +
+          '<div class="form-group av-toggle-row"><label class="av-switch"><input type="checkbox" name="euroCroissance"' + (f.euroCroissance ? " checked" : "") + ' /><span>Contrat investi en fonds euro-croissance</span></label></div>' +
+          '<div class="form-group"><label for="av-uc">Unités de compte</label><select id="av-uc" class="form-control" name="pctUC">' +
+            avSelectOptions(AV_PCT_OPTIONS, f.pctUC, function (v) { return v + " %"; }) +
+          '</select></div>' +
+          '<div class="form-group"><label for="av-euro">Fonds euros</label><select id="av-euro" class="form-control" name="pctEuros" disabled>' +
+            avSelectOptions(AV_PCT_OPTIONS, f.pctEuros, function (v) { return v + " %"; }) +
+          '</select></div>' +
+          '<div class="form-group av-donut-wrap"><div class="av-donut" id="av-donut" style="--av-pct:' + f.pctEuros + '%"><span>Fonds euros ' + f.pctEuros + ' %</span><span>UC ' + f.pctUC + ' %</span></div></div>' +
+          '<div class="form-group"><label for="av-taux-net">Taux de rendement net de début de contrat</label><input id="av-taux-net" class="form-control" type="text" readonly value="' + tauxNet.toFixed(2).replace(".", ",") + ' %" /></div>' +
+          '<div class="form-group span-2"><label for="av-composition">Composition de l\'allocation</label><input id="av-composition" type="range" min="0" max="100" name="composition" value="' + f.composition + '" class="av-range" /><div class="av-range-labels"><span>Prudent</span><span id="av-comp-label">' + f.pctUC + ' % UC</span><span>Offensif</span></div></div>' +
+          '<div class="form-group"><label for="av-te">Taux de rendement net des fonds euros</label><select id="av-te" class="form-control" name="tauxEuro">' +
+            avSelectOptions(AV_TAUX_EURO_OPTS, f.tauxEuro, function (v) { return v.toString().replace(".", ",") + " %"; }) +
+          '</select></div>' +
+          '<div class="form-group"><label for="av-tuc">Taux de rendement net des unités de compte</label><select id="av-tuc" class="form-control" name="tauxUC">' +
+            avSelectOptions(AV_TAUX_UC_OPTS, f.tauxUC, function (v) { return v.toString().replace(".", ",") + " %"; }) +
+          '</select></div>' +
+          '<div class="form-group span-2"><button type="button" class="btn btn-outline" id="av-parametres">⚙ Paramètres</button></div>' +
+        '</div></div></form></div>';
+    } else {
+      html += '<div class="av-main av-results-main">' +
+        '<div class="av-subtabs"><button type="button" class="av-subtab' + (st.resultSubTab === "capital" ? " is-active" : "") + '" data-av-subtab="capital">Capital</button>' +
+        '<button type="button" class="av-subtab' + (st.resultSubTab === "rachat" ? " is-active" : "") + '" data-av-subtab="rachat">Rachat</button></div>' +
+        renderResultTable() +
+        '<p class="av-disclaimer">Simulation non contractuelle — Colinéa Patrimoine</p></div>';
+    }
+
+    html += renderSidebar() + '</div>' +
+      '<div class="av-footer">' +
+        (st.tab === "resultats" ? '<button type="button" class="btn btn-outline" id="av-prev">← Précédent</button>' : '<span></span>') +
+        '<div class="av-footer-right">' +
+          (st.tab === "projet" && st.calculated ? '<button type="button" class="btn btn-outline" id="av-print">Imprimer</button><button type="button" class="btn btn-primary" id="av-next">Suivant →</button>' : '') +
+          (st.tab === "projet" ? '<button type="button" class="btn btn-primary" id="av-calc">Calculer</button>' : '<button type="button" class="btn btn-outline" id="av-print">Imprimer</button>') +
+          '<a class="btn btn-outline" href="#/simulations' + (client ? "?clientId=" + encodeURIComponent(client.id) : "") + '">Fermer</a>' +
+        '</div></div>';
+
+    if (st.showParametres) {
+      html += '<div class="av-modal-backdrop" id="av-modal-backdrop"><div class="av-modal" role="dialog" aria-labelledby="av-modal-title">' +
+        '<div class="av-modal-head"><h3 id="av-modal-title">Paramètres</h3><button type="button" class="av-modal-close" id="av-modal-close">×</button></div>' +
+        '<div class="app-form av-grid">' +
+          '<div class="form-group"><label>Frais sur versement initial <span class="req">*</span></label><input class="form-control" type="number" step="0.1" name="fraisInitial" value="' + f.fraisInitial + '" /> %</div>' +
+          '<div class="form-group"><label>Frais sur versements périodiques <span class="req">*</span></label><input class="form-control" type="number" step="0.1" name="fraisPeriodique" value="' + f.fraisPeriodique + '" /> %</div>' +
+          '<div class="form-group"><label>Frais sur versements exceptionnels <span class="req">*</span></label><input class="form-control" type="number" step="0.1" name="fraisExceptionnel" value="' + f.fraisExceptionnel + '" /> %</div>' +
+          '<div class="form-group span-2"><label>Indexation annuelle des versements périodiques — Au taux de</label><input class="form-control" type="number" step="0.1" name="indexation" value="' + f.indexation + '" /> %</div>' +
+          '<div class="form-group"><label>Nature des versements</label><label><input type="radio" name="natureVersements" value="bruts"' + (f.natureVersements === "bruts" ? " checked" : "") + ' /> Bruts</label> <label><input type="radio" name="natureVersements" value="nets"' + (f.natureVersements === "nets" ? " checked" : "") + ' /> Nets</label></div>' +
+          '<div class="form-group"><label>Nature des rachats</label><label><input type="radio" name="natureRachats" value="bruts"' + (f.natureRachats === "bruts" ? " checked" : "") + ' /> Bruts</label> <label><input type="radio" name="natureRachats" value="nets"' + (f.natureRachats === "nets" ? " checked" : "") + ' /> Nets</label></div>' +
+        '</div>' +
+        '<div class="av-modal-actions"><button type="button" class="btn btn-outline" id="av-modal-cancel">Abandonner</button><button type="button" class="btn btn-primary" id="av-modal-save">Enregistrer</button></div>' +
+      '</div></div>';
+    }
+
+    html += '</section>';
+    render(html);
+
+    function collectForm() {
+      var formEl = document.getElementById("av-form");
+      if (!formEl) return;
+      var fd = new FormData(formEl);
+      f.dateNaissance = fd.get("dateNaissance") || f.dateNaissance;
+      f.situationFiscale = fd.get("situationFiscale") || f.situationFiscale || "celibataire";
+      f.encoursAvant2017 = Number(fd.get("encoursAvant2017") || 0);
+      f.encoursApres2017 = Number(fd.get("encoursApres2017") || 0);
+      f.connaitFiscalite = !!formEl.querySelector("[name=connaitFiscalite]")?.checked;
+      if (fd.get("choixFiscaliteAvant2017")) f.choixFiscaliteAvant2017 = fd.get("choixFiscaliteAvant2017");
+      if (fd.get("choixFiscaliteApres2017")) {
+        f.choixFiscaliteApres2017 = fd.get("choixFiscaliteApres2017");
+        f.choixFiscalite = f.choixFiscaliteApres2017;
+      }
+      f.abattementDispo = Number(fd.get("abattementDispo") || getAbattementMaxAv(f));
+      f.objectif = fd.get("objectif") || f.objectif;
+      f.valeurRecherchee = fd.get("valeurRecherchee") || f.valeurRecherchee;
+      f.libelleProduit = fd.get("libelleProduit") || f.libelleProduit;
+      f.modeGestion = fd.get("modeGestion") || f.modeGestion;
+      f.dateInvestissement = fd.get("dateInvestissement") || f.dateInvestissement;
+      f.horizonAns = Number(fd.get("horizonAns") || 0);
+      f.horizonMois = Number(fd.get("horizonMois") || 0);
+      f.versementInitial = Number(fd.get("versementInitial") || 0);
+      f.pctUC = Number(fd.get("pctUC") || 0);
+      f.pctEuros = 100 - f.pctUC;
+      f.euroCroissance = !!formEl.querySelector("[name=euroCroissance]")?.checked;
+      f.tauxEuro = Number(fd.get("tauxEuro") || 0);
+      f.tauxUC = Number(fd.get("tauxUC") || 0);
+      f.composition = Number(fd.get("composition") || 0);
+      normalizeAllocationAv(f);
+      document.querySelectorAll(".av-v-type").forEach(function (el) {
+        var i = +el.getAttribute("data-vidx");
+        if (f.versements[i]) f.versements[i].type = el.value;
+      });
+      document.querySelectorAll(".av-v-montant").forEach(function (el) {
+        var i = +el.getAttribute("data-vidx");
+        if (f.versements[i]) f.versements[i].montant = Number(el.value || 0);
+      });
+      document.querySelectorAll(".av-v-periodicite").forEach(function (el) {
+        var i = +el.getAttribute("data-vidx");
+        if (f.versements[i]) f.versements[i].periodicite = el.value;
+      });
+      document.querySelectorAll(".av-v-date").forEach(function (el) {
+        var i = +el.getAttribute("data-vidx");
+        if (f.versements[i]) f.versements[i].dateDebut = el.value;
+      });
+      document.querySelectorAll(".av-r-type").forEach(function (el) {
+        var i = +el.getAttribute("data-ridx");
+        if (f.rachats[i]) f.rachats[i].type = el.value;
+      });
+      document.querySelectorAll(".av-r-montant").forEach(function (el) {
+        var i = +el.getAttribute("data-ridx");
+        if (f.rachats[i]) f.rachats[i].montant = Number(el.value || 0);
+      });
+      document.querySelectorAll(".av-r-date").forEach(function (el) {
+        var i = +el.getAttribute("data-ridx");
+        if (f.rachats[i]) f.rachats[i].date = el.value;
+      });
+    }
+
+    function syncAllocationUI() {
+      normalizeAllocationAv(f);
+      var ucSel = document.getElementById("av-uc");
+      var euroSel = document.getElementById("av-euro");
+      var tauxNetEl = document.getElementById("av-taux-net");
+      var donut = document.getElementById("av-donut");
+      var comp = document.getElementById("av-composition");
+      var compLabel = document.getElementById("av-comp-label");
+      if (ucSel) ucSel.value = String(f.pctUC);
+      if (euroSel) euroSel.value = String(f.pctEuros);
+      if (tauxNetEl) tauxNetEl.value = getTauxNetAv(f).toFixed(2).replace(".", ",") + " %";
+      if (donut) {
+        donut.style.setProperty("--av-pct", f.pctEuros + "%");
+        donut.innerHTML = "<span>Fonds euros " + f.pctEuros + " %</span><span>UC " + f.pctUC + " %</span>";
+      }
+      if (comp) comp.value = String(f.composition);
+      if (compLabel) compLabel.textContent = f.pctUC + " % UC";
+    }
+
+    function updateResultsUI() {
+      if (!st.calculated || !st.results) return;
+      var r = st.results;
+      var el;
+      el = document.getElementById("av-kpi-capital"); if (el) el.textContent = fmtEuroAv(r.capitalBrut);
+      el = document.getElementById("av-kpi-net"); if (el) el.textContent = fmtEuroAv(r.epargneNette);
+      el = document.getElementById("av-kpi-produits"); if (el) el.textContent = fmtEuroAv(r.totalProduitsBruts);
+      var sidebar = document.getElementById("av-sidebar");
+      if (sidebar && st.tab === "projet") {
+        var tmp = document.createElement("div");
+        tmp.innerHTML = renderSidebar();
+        sidebar.replaceWith(tmp.firstElementChild);
+      }
+    }
+
+    function triggerAvRecalc() {
+      collectForm();
+      syncAllocationUI();
+      if (!f.dateInvestissement) return;
+      st.results = computeAssuranceVie(f);
+      if (st.results) {
+        st.calculated = true;
+        res = st.results;
+        updateResultsUI();
+      }
+    }
+
+    document.querySelectorAll("[data-av-tab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (btn.disabled) return;
+        collectForm();
+        if (btn.getAttribute("data-av-tab") === "resultats") triggerAvRecalc();
+        st.tab = btn.getAttribute("data-av-tab");
+        route();
+      });
+    });
+
+    document.querySelectorAll("[data-av-subtab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        st.resultSubTab = btn.getAttribute("data-av-subtab");
+        route();
+      });
+    });
+
+    var addV = document.getElementById("av-add-versement");
+    if (addV) addV.addEventListener("click", function () {
+      collectForm();
+      f.versements.push({ type: "exceptionnel", montant: 0, dateDebut: f.dateInvestissement });
+      route();
+    });
+    var addR = document.getElementById("av-add-rachat");
+    if (addR) addR.addEventListener("click", function () {
+      collectForm();
+      f.rachats.push({ type: "partiel", montant: 0, date: f.dateInvestissement });
+      route();
+    });
+
+    document.querySelectorAll(".av-v-del").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        collectForm();
+        f.versements.splice(+btn.getAttribute("data-vidx"), 1);
+        route();
+      });
+    });
+    document.querySelectorAll(".av-r-del").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        collectForm();
+        f.rachats.splice(+btn.getAttribute("data-ridx"), 1);
+        route();
+      });
+    });
+
+    var uc = document.getElementById("av-uc");
+    if (uc) uc.addEventListener("change", function () {
+      f.pctUC = Number(uc.value) || 0;
+      f.pctEuros = 100 - f.pctUC;
+      f.composition = Math.round(Math.min(100, Math.max(0, (f.pctUC - 10) / 0.8)));
+      syncAllocationUI();
+      triggerAvRecalc();
+    });
+
+    var comp = document.getElementById("av-composition");
+    if (comp) comp.addEventListener("input", function () {
+      f.composition = Number(comp.value) || 0;
+      f.pctUC = Math.round(10 + f.composition * 0.8);
+      f.pctEuros = 100 - f.pctUC;
+      syncAllocationUI();
+      triggerAvRecalc();
+    });
+
+    var formEl = document.getElementById("av-form");
+    if (formEl) {
+      formEl.addEventListener("change", function (e) {
+        if (e.target.id === "av-uc" || e.target.id === "av-composition") return;
+        if (e.target.name === "connaitFiscalite") {
+          collectForm();
+          route();
+          return;
+        }
+        if (e.target.name === "situationFiscale") {
+          collectForm();
+          if (f.abattementDispo > getAbattementMaxAv(f)) f.abattementDispo = getAbattementMaxAv(f);
+          route();
+          return;
+        }
+        triggerAvRecalc();
+      });
+    }
+
+    document.querySelectorAll(".av-v-type").forEach(function (el) {
+      el.addEventListener("change", function () {
+        collectForm();
+        route();
+      });
+    });
+    document.querySelectorAll(".av-r-type").forEach(function (el) {
+      el.addEventListener("change", function () {
+        collectForm();
+        route();
+      });
+    });
+
+    var paramBtn = document.getElementById("av-parametres");
+    if (paramBtn) paramBtn.addEventListener("click", function () { collectForm(); st.showParametres = true; route(); });
+    var modalClose = document.getElementById("av-modal-close");
+    var modalCancel = document.getElementById("av-modal-cancel");
+    var modalSave = document.getElementById("av-modal-save");
+    var modalBackdrop = document.getElementById("av-modal-backdrop");
+    function closeModal() { st.showParametres = false; route(); }
+    if (modalClose) modalClose.addEventListener("click", closeModal);
+    if (modalCancel) modalCancel.addEventListener("click", closeModal);
+    if (modalSave) modalSave.addEventListener("click", function () {
+      var m = modalBackdrop;
+      if (m) {
+        f.fraisInitial = Number(m.querySelector("[name=fraisInitial]").value || 1);
+        f.fraisPeriodique = Number(m.querySelector("[name=fraisPeriodique]").value || 1);
+        f.fraisExceptionnel = Number(m.querySelector("[name=fraisExceptionnel]").value || 1);
+        f.indexation = Number(m.querySelector("[name=indexation]").value || 0);
+        f.natureVersements = m.querySelector("[name=natureVersements]:checked")?.value || "bruts";
+        f.natureRachats = m.querySelector("[name=natureRachats]:checked")?.value || "bruts";
+      }
+      st.showParametres = false;
+      route();
+    });
+
+    var calcBtn = document.getElementById("av-calc");
+    if (calcBtn) calcBtn.addEventListener("click", function () {
+      collectForm();
+      if (!f.dateInvestissement) { alert("Veuillez renseigner la date d'investissement."); return; }
+      triggerAvRecalc();
+      if (!st.results) { alert("Impossible de calculer : vérifiez la date et l'horizon."); return; }
+      route();
+    });
+
+    var nextBtn = document.getElementById("av-next");
+    if (nextBtn) nextBtn.addEventListener("click", function () { st.tab = "resultats"; route(); });
+    var prevBtn = document.getElementById("av-prev");
+    if (prevBtn) prevBtn.addEventListener("click", function () { st.tab = "projet"; route(); });
+    document.querySelectorAll("#av-print").forEach(function (btn) { btn.addEventListener("click", function () { window.print(); }); });
   }
 
   function viewSimulator(params) {
@@ -1245,6 +2386,11 @@
 
     if (id === "profil-investisseur") {
       viewProfilInvestisseur(params, sim, client);
+      return;
+    }
+
+    if (id === "assurance-vie") {
+      viewAssuranceVie(params, sim, client);
       return;
     }
 
